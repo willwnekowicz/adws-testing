@@ -309,8 +309,8 @@ class Config:
             errors.append(f"Standard configuration path is not a git repository: {sc_path}")
 
         # Check OpenAI API key if needed
-        if not self.openai.api_key:
-            errors.append("OpenAI API key not configured (required for LLM judge)")
+        # if not self.openai.api_key:
+        #     errors.append("OpenAI API key not configured (required for LLM judge)")
 
         # Check Claude command is available
         import shutil

@@ -6,7 +6,6 @@ import uuid
 from sqlalchemy import create_engine, Column, String, DateTime, Integer, Float, Boolean, Text, JSON, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, Session
-from sqlalchemy.dialects.sqlite import UUID
 
 Base = declarative_base()
 

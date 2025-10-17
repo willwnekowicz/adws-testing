@@ -1,0 +1,7 @@
+{
+  "session_id": "26c9498c-0dbc-4539-8f99-ca7060342172",
+  "prompts": [
+    "/install ",
+    "run the test: python cli.py test project-init"
+  ]
+}
