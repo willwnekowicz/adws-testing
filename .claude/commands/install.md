@@ -1,52 +1,45 @@
 # Install
 > Install the ADWS Testing Framework and initialize the environment
 
-## Create virtual environment
+## Read
+requirements.txt
+setup.py
+config.yaml
+
+## Run
 ```bash
+# Create and activate virtual environment
 python3 -m venv venv
-```
-
-## Activate virtual environment
-```bash
 source venv/bin/activate
-```
 
-## Install dependencies
-```bash
+# Upgrade pip and install dependencies
 pip install --upgrade pip
 pip install -r requirements.txt
-```
 
-## Install package in development mode
-```bash
+# Install package in development mode
 pip install -e .
-```
 
-## Initialize database and directories
-```bash
+# Set environment variables (required for OpenAI LLM judge)
+export OPENAI_API_KEY="your-api-key-here"
+
+# Initialize the framework
 python cli.py init
-```
 
-## Run Alembic migrations
-```bash
+# Run database migrations
 alembic upgrade head
 ```
 
-## Validate configuration
+## Report
 ```bash
+# Validate configuration
 python cli.py validate
-```
 
-## Set environment variables (if needed)
-```bash
-# Set your OpenAI API key for LLM judge features
-export OPENAI_API_KEY="your-api-key-here"
-
-# Optional: Override standard-configuration path
-# export STANDARD_CONFIG_PATH="~/ai/standard-configuration"
-```
-
-## Verify installation
-```bash
+# Show CLI help to confirm installation
 python cli.py --help
+
+# List Python packages
+pip list | grep -E "sqlalchemy|alembic|psutil|click|openai|gitpython"
+
+# Check database initialization
+ls -la test_runs.db 2>/dev/null || echo "Database will be created on first run"
 ```

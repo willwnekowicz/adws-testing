@@ -5,6 +5,7 @@
     "This does not make sense: claude -p --model gpt-4o. You cannot run claude with openai's models. For this task, let's run it with once with haiku and once with sonnet. In the future, I will specify the default model in some runners within the project, though, we'll still want to test multiple models. ",
     "we want the 4.5 sonnet and 4.5 haiku models. Let's always use the latest.",
     "let's commit this",
-    "let's imagine each time we run this, it will be done in a brand new execution envrionment. Let's create an install and prime command under .claude/commands structurally similar\n  to the ones below, but specific to this project:\n\n  install.md\n  [Pasted text #1 +27 lines]\n\n  prime.md\n  # Prime\n  > Execute the following sections to understand the codebase then summarize your understanding.\n\n  ## Run\n  git ls-files\n\n  ## Read\n  README.md\n  adws/README.md"
+    "let's imagine each time we run this, it will be done in a brand new execution envrionment. Let's create an install and prime command under .claude/commands structurally similar\n  to the ones below, but specific to this project:\n\n  install.md\n  [Pasted text #1 +27 lines]\n\n  prime.md\n  # Prime\n  > Execute the following sections to understand the codebase then summarize your understanding.\n\n  ## Run\n  git ls-files\n\n  ## Read\n  README.md\n  adws/README.md",
+    "i fixed the prime command. Let's stay more structurally similar to the example i gave you for install... Read, Read & Execute (including the prime command), Run, and Report"
   ]
 }
