@@ -49,4 +49,4 @@ logs/
 # Alembic
 alembic.ini.local
 
-.claude/data/
+.claude/data/**/*

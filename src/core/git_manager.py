@@ -157,16 +157,19 @@ class GitManager:
     def prepare_for_project_init(self, workspace_path: Path):
         """Prepare workspace for project-init test.
 
-        Removes files except .claude directory (needed for slash commands).
+        Removes files except .claude and .adws directories (needed for standard-configuration).
 
         Args:
             workspace_path: Path to the workspace
         """
-        # Remove contents except .claude (needed for slash commands)
+        # List of directories to preserve from standard-configuration
+        preserved_dirs = {'.claude', '.adws'}
+
+        # Remove contents except preserved directories
         if workspace_path.exists():
             for item in workspace_path.iterdir():
-                # Keep .claude directory for slash commands
-                if item.name == '.claude':
+                # Keep .claude directory (for slash commands) and .adws (for AI Developer Workflows)
+                if item.name in preserved_dirs:
                     continue
 
                 if item.is_dir():
@@ -176,7 +179,7 @@ class GitManager:
                     item.unlink()
                     logger.info(f"Removed file: {item}")
 
-            logger.info(f"Cleared contents (except .claude) from {workspace_path} for project-init test")
+            logger.info(f"Cleared contents (except {preserved_dirs}) from {workspace_path} for project-init test")
 
     def get_available_branches(self) -> list:
         """Get list of available branches.
