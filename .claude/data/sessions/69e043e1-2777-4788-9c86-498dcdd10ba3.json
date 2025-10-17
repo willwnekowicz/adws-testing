@@ -1,0 +1,6 @@
+{
+  "session_id": "69e043e1-2777-4788-9c86-498dcdd10ba3",
+  "prompts": [
+    "when storing runs, let's use a timestamp_runId. date,hour,minute should be enough"
+  ]
+}

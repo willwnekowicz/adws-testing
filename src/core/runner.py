@@ -50,7 +50,12 @@ class TestRunner:
         Returns:
             Run ID
         """
-        run_id = str(uuid.uuid4())
+        # Generate timestamp-based run ID (format: YYYYMMDD_HHMM_shortUUID)
+        now = datetime.now()
+        timestamp_prefix = now.strftime("%Y%m%d_%H%M")
+        # Add a short UUID suffix to ensure uniqueness for runs in the same minute
+        short_uuid = str(uuid.uuid4())[:8]
+        run_id = f"{timestamp_prefix}_{short_uuid}"
         start_time = datetime.utcnow()
 
         # Initialize components
@@ -85,7 +90,13 @@ class TestRunner:
         )
 
         # Create test workspace
-        workspace_path = git_manager.create_test_workspace(run_id, self.config.artifacts.base_path)
+        # Use temp directory for project-init to ensure complete isolation
+        use_temp = (test_name == "project-init")
+        workspace_path = git_manager.create_test_workspace(
+            run_id,
+            self.config.artifacts.base_path,
+            use_temp_dir=use_temp
+        )
         test_logger.info(f"Created workspace: {workspace_path}")
 
         # Add test case to database

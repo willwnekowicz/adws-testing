@@ -63,7 +63,7 @@ class GitManager:
             logger.error(f"Failed to checkout {ref}: {e}")
             raise
 
-    def create_test_workspace(self, run_id: str, base_path: str = "./runs") -> Path:
+    def create_test_workspace(self, run_id: str, base_path: str = "./runs", use_temp_dir: bool = False) -> Path:
         """Create an isolated workspace for testing.
 
         This creates a copy of the repository without .git directory
@@ -72,12 +72,32 @@ class GitManager:
         Args:
             run_id: Unique run identifier
             base_path: Base directory for test runs
+            use_temp_dir: If True, create workspace in system temp directory
 
         Returns:
             Path to the created workspace
         """
-        workspace_path = Path(base_path) / run_id / "workspace"
-        workspace_path.mkdir(parents=True, exist_ok=True)
+        if use_temp_dir:
+            # Create workspace in temp directory for complete isolation
+            temp_base = Path(tempfile.gettempdir()) / "adws-testing"
+            workspace_path = temp_base / run_id / "workspace"
+            workspace_path.mkdir(parents=True, exist_ok=True)
+
+            # Create a symlink in the normal runs directory for easy access
+            runs_path = Path(base_path) / run_id
+            runs_path.mkdir(parents=True, exist_ok=True)
+            symlink_path = runs_path / "workspace"
+            if symlink_path.exists() or symlink_path.is_symlink():
+                symlink_path.unlink()
+            try:
+                symlink_path.symlink_to(workspace_path)
+                logger.info(f"Created symlink from {symlink_path} to {workspace_path}")
+            except OSError:
+                # Symlink creation might fail on some systems
+                logger.warning(f"Could not create symlink, using temp workspace directly")
+        else:
+            workspace_path = Path(base_path) / run_id / "workspace"
+            workspace_path.mkdir(parents=True, exist_ok=True)
 
         # Copy the repository, excluding .git and other unwanted files
         self._copy_repository(self.repo_path, workspace_path)
@@ -111,21 +131,26 @@ class GitManager:
     def prepare_for_project_init(self, workspace_path: Path):
         """Prepare workspace for project-init test.
 
-        Removes any existing git configuration.
+        Removes files except .claude directory (needed for slash commands).
 
         Args:
             workspace_path: Path to the workspace
         """
-        git_dir = workspace_path / ".git"
-        if git_dir.exists():
-            shutil.rmtree(git_dir)
-            logger.info(f"Removed existing .git directory from {workspace_path}")
+        # Remove contents except .claude (needed for slash commands)
+        if workspace_path.exists():
+            for item in workspace_path.iterdir():
+                # Keep .claude directory for slash commands
+                if item.name == '.claude':
+                    continue
 
-        # Remove any existing README.md
-        readme = workspace_path / "README.md"
-        if readme.exists():
-            readme.unlink()
-            logger.info(f"Removed existing README.md from {workspace_path}")
+                if item.is_dir():
+                    shutil.rmtree(item)
+                    logger.info(f"Removed directory: {item}")
+                else:
+                    item.unlink()
+                    logger.info(f"Removed file: {item}")
+
+            logger.info(f"Cleared contents (except .claude) from {workspace_path} for project-init test")
 
     def get_available_branches(self) -> list:
         """Get list of available branches.

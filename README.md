@@ -21,13 +21,26 @@ A comprehensive testing harness for the standard-configuration project. This fra
 - Python 3.8 or higher
 - Git
 - Claude CLI (`claude` command available in PATH)
-- OpenAI API key (for LLM judge features)
+- OpenAI API key (optional, for LLM judge features)
 
-### Setup
+### Quick Setup
+
+Run the installation script which handles everything:
+```bash
+python install.py
+```
+
+This will:
+- Create a Python virtual environment
+- Install all required dependencies
+- Run database migrations
+- Validate your configuration
+
+### Manual Setup
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/adws-testing.git
+git clone <repository-url>
 cd adws-testing
 ```
 
@@ -42,14 +55,9 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Install the package:
+4. Run database migrations:
 ```bash
-pip install -e .
-```
-
-5. Initialize the framework:
-```bash
-adws-test init
+alembic upgrade head
 ```
 
 ## Configuration
@@ -66,16 +74,18 @@ standard_configuration:
 claude:
   command: "claude"
   models:
-    sonnet: "claude-3-5-sonnet-latest"
-    haiku: "claude-3-5-haiku-latest"
-  default_model: "claude-3-5-sonnet-latest"
+    sonnet: "sonnet"  # Use model aliases
+    haiku: "haiku"
+  default_model: "sonnet"
   default_args:
-    - "--stream-json"
+    - "--output-format"
+    - "stream-json"
     - "--verbose"
     - "-p"
+    - "--dangerously-skip-permissions"  # Required for automated testing
 
 openai:
-  api_key: "${OPENAI_API_KEY}"  # Set via environment variable
+  api_key: "${OPENAI_API_KEY}"  # Set via environment variable (optional)
   judge_model: "gpt-4o-mini"
 
 process:
@@ -101,67 +111,72 @@ export STANDARD_CONFIG_PATH="~/ai/standard-configuration"  # Optional override
 
 Run the project-init test with both models:
 ```bash
-adws-test test project-init
+python cli.py test project-init
 ```
 
 Run with a specific model:
 ```bash
-adws-test test project-init --model sonnet
-adws-test test project-init --model haiku
+python cli.py test project-init --model sonnet
+python cli.py test project-init --model haiku
 ```
 
 Test a specific commit or branch:
 ```bash
-adws-test test project-init --commit abc123
-adws-test test project-init --branch feature-branch
+python cli.py test project-init --commit abc123
+python cli.py test project-init --branch feature-branch
 ```
 
 ### Viewing Results
 
-View latest test results:
+List recent runs:
 ```bash
-adws-test results --latest
+python cli.py list
 ```
 
 View specific run results:
 ```bash
-adws-test results <run-id>
+python cli.py show <run-id>
 ```
 
-List recent runs:
-```bash
-adws-test list --limit 20
-```
+### Checking Test Artifacts
 
-Get JSON output for CI/CD:
-```bash
-adws-test results --latest --json > results.json
-```
-
-### Validation
-
-Validate your configuration:
-```bash
-adws-test validate
-```
+Each test run creates a directory in `runs/` with:
+- `stdout.log` - Claude's complete output
+- `stderr.log` - Error output
+- `summary.json` - Test run summary
+- `process_info.json` - Process tracking information
+- `checks/` - Individual check results
+- `workspace/` - Symlink to the isolated test workspace
 
 ## Test Structure
+
+### Workspace Isolation
+
+Tests run in completely isolated environments:
+- Temporary directories in system temp folder prevent git repository conflicts
+- Parent repository details are stripped for clean initialization
+- Symlinks in `runs/` directory provide easy access to workspaces
+- Each test gets a fresh, uncontaminated workspace
 
 ### Project-Init Test
 
 The included `project-init` test validates that the `/project-init` slash command correctly:
 
-1. Creates a README.md file
+1. Creates a README.md file with project structure
 2. Initializes a git repository
-3. Creates main and staging branches
-4. Leaves the repository on the staging branch
+3. Creates both main and staging branches
+4. Sets up comprehensive .gitignore file
+5. Leaves the repository on the staging branch
+6. Creates initial commit
 
 Checks performed:
-- File existence checks
-- File content validation
-- Git branch verification
-- Execution time limits
-- Process completion monitoring
+- `readme_exists` - Verifies README.md creation
+- `readme_has_content` - Ensures README has markdown content
+- `git_initialized` - Checks .git directory exists
+- `git_branches_configured` - Validates both main and staging branches exist
+- `on_staging_branch` - Confirms current branch is staging
+- `execution_time` - Ensures completion within 2 minutes
+- `project_init_complete` - Composite check for overall success
 
 ### Creating New Tests
 
@@ -284,25 +299,43 @@ jobs:
           path: results.json
 ```
 
+## Key Features
+
+### Permission Bypass for Testing
+
+The framework uses `--dangerously-skip-permissions` flag to enable automated testing without user prompts. This is essential for CI/CD integration and unattended test execution.
+
+### Timestamp-based Run IDs
+
+Run IDs follow the format `YYYYMMDD_HHMM_shortUUID` for easy chronological sorting and identification.
+
+### Process Monitoring
+
+Uses psutil to track all spawned processes, ensuring cleanup and preventing orphaned processes.
+
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Claude command not found**
-   - Ensure `claude` is installed and in your PATH
-   - Check configuration: `adws-test validate`
+1. **Test fails with "permission denied" or Claude asks for permissions**
+   - Ensure `--dangerously-skip-permissions` is in the `default_args` in config.yaml
+   - This flag is required for automated testing
 
-2. **OpenAI API key not working**
-   - Verify the key is set: `echo $OPENAI_API_KEY`
-   - Check API key validity with OpenAI
+2. **Git branch tests fail (missing main branch)**
+   - Fixed in latest version - ensure project-init.md includes initial commit
+   - The framework now creates an empty commit to establish branches properly
 
-3. **Process tracking issues**
-   - Ensure psutil is installed: `pip install psutil`
-   - Check process permissions
+3. **Workspace conflicts with parent repository**
+   - Framework uses temp directories for complete isolation
+   - Check that symlinks are created properly in runs/ directory
 
-4. **Database errors**
+4. **Model not found errors**
+   - Use model aliases: `"sonnet"` and `"haiku"` instead of full model names
+   - Check config.yaml for proper model configuration
+
+5. **Database errors**
    - Run migrations: `alembic upgrade head`
-   - Reinitialize: `adws-test init`
+   - Check SQLite database permissions
 
 ## Contributing
 

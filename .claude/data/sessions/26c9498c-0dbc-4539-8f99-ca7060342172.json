@@ -2,6 +2,8 @@
   "session_id": "26c9498c-0dbc-4539-8f99-ca7060342172",
   "prompts": [
     "/install ",
-    "run the test: python cli.py test project-init"
+    "run the test: python cli.py test project-init",
+    "for this particular test, we need to strip the git details so that it does initialize a git repo on its own. It should also make sure not to get confused with this testing framework's git repo. Is there a good way to isolate the workspace/run for the test?",
+    "ok, looks like claude didn't have the permissions to write. When we test slash commands, let's make sure we start them with --dangerously-skip-permissions. Refer to Claude Code docs for details on that claude cli flag."
   ]
 }
