@@ -30,6 +30,7 @@ class Run(Base):
 
     # Relationships
     test_cases = relationship("TestCase", back_populates="run", cascade="all, delete-orphan")
+    build = relationship("Build", back_populates="run", cascade="all, delete-orphan", uselist=False)
 
 
 class TestCase(Base):
@@ -84,6 +85,42 @@ class ProcessLog(Base):
 
     # Relationships
     test_case = relationship("TestCase", back_populates="process_logs")
+
+
+class Build(Base):
+    """Tracks build operations."""
+    __tablename__ = 'builds'
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    run_id = Column(String(36), ForeignKey('runs.id'), nullable=False)
+    commit_hash = Column(String(40), nullable=True)
+    build_script = Column(Text, nullable=True)
+    status = Column(String(20), nullable=False)  # 'success', 'failed', 'skipped'
+    duration_seconds = Column(Float, nullable=True)
+    output_path = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
+    cache_hit = Column(Boolean, default=False)
+    files_built = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    run = relationship("Run", back_populates="build", uselist=False)
+    artifacts = relationship("BuildArtifact", back_populates="build", cascade="all, delete-orphan")
+
+
+class BuildArtifact(Base):
+    """Tracks build artifacts."""
+    __tablename__ = 'build_artifacts'
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    build_id = Column(String(36), ForeignKey('builds.id'), nullable=False)
+    artifact_type = Column(String(50), nullable=False)  # 'log', 'manifest', 'cache'
+    file_path = Column(Text, nullable=False)
+    file_size = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    build = relationship("Build", back_populates="artifacts")
 
 
 class DatabaseManager:
@@ -232,5 +269,74 @@ class DatabaseManager:
             session.add(log)
             session.commit()
             return log.id
+        finally:
+            session.close()
+
+    def add_build(self, run_id: str, commit_hash: Optional[str] = None,
+                  build_script: Optional[str] = None, status: str = 'running',
+                  duration_seconds: Optional[float] = None,
+                  output_path: Optional[str] = None,
+                  error_message: Optional[str] = None,
+                  cache_hit: bool = False,
+                  files_built: Optional[int] = None) -> str:
+        """Add a build record.
+
+        Args:
+            run_id: Run ID
+            commit_hash: Git commit hash
+            build_script: Path to build script
+            status: Build status ('success', 'failed', 'skipped')
+            duration_seconds: Build duration in seconds
+            output_path: Path to build output
+            error_message: Error message if failed
+            cache_hit: Whether build was retrieved from cache
+            files_built: Number of files built
+
+        Returns:
+            Build ID
+        """
+        session = self.get_session()
+        try:
+            build = Build(
+                run_id=run_id,
+                commit_hash=commit_hash,
+                build_script=build_script,
+                status=status,
+                duration_seconds=duration_seconds,
+                output_path=output_path,
+                error_message=error_message,
+                cache_hit=cache_hit,
+                files_built=files_built
+            )
+            session.add(build)
+            session.commit()
+            return build.id
+        finally:
+            session.close()
+
+    def add_build_artifact(self, build_id: str, artifact_type: str,
+                          file_path: str, file_size: Optional[int] = None) -> str:
+        """Add a build artifact record.
+
+        Args:
+            build_id: Build ID
+            artifact_type: Type of artifact ('log', 'manifest', 'cache')
+            file_path: Path to artifact file
+            file_size: Size of artifact file
+
+        Returns:
+            Build artifact ID
+        """
+        session = self.get_session()
+        try:
+            artifact = BuildArtifact(
+                build_id=build_id,
+                artifact_type=artifact_type,
+                file_path=file_path,
+                file_size=file_size
+            )
+            session.add(artifact)
+            session.commit()
+            return artifact.id
         finally:
             session.close()

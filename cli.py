@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from src.core.config import Config
 from src.core.runner import TestRunner
+from src.core.build_manager import BuildManager
 from tests.test_project_init import get_project_init_checks
 
 
@@ -38,9 +39,10 @@ def cli(ctx, config):
 @click.option('--models', help='Comma-separated list of models to test')
 @click.option('--commit', help='Specific commit to test')
 @click.option('--branch', help='Specific branch to test')
+@click.option('--build/--no-build', default=None, help='Build before testing (default: auto-detect)')
 @click.option('--json', 'output_json', is_flag=True, help='Output results as JSON')
 @click.pass_context
-def test(ctx, test_name, model, models, commit, branch, output_json):
+def test(ctx, test_name, model, models, commit, branch, build, output_json):
     """Run a test case."""
     config = ctx.obj['config']
     runner = TestRunner(config)
@@ -82,7 +84,8 @@ def test(ctx, test_name, model, models, commit, branch, output_json):
                 model=model_name,
                 commit=commit,
                 branch=branch,
-                checks=checks
+                checks=checks,
+                build=build
             )
             run_ids.append(run_id)
 
@@ -264,6 +267,59 @@ def validate(ctx):
         click.echo(click.style(f"  ✗ Claude command not found: {config.claude.command}", fg='red'))
 
     click.echo("\nValidation complete!")
+
+
+@cli.command()
+@click.option('--commit', help='Specific commit to build')
+@click.option('--force', is_flag=True, help='Force rebuild even if cached')
+@click.option('--clean', is_flag=True, help='Clean dist directory before building')
+@click.pass_context
+def build(ctx, commit, force, clean):
+    """Build the standard-configuration project."""
+    config = ctx.obj['config']
+    build_manager = BuildManager(config)
+
+    click.echo("Building standard-configuration...")
+
+    # Clean if requested
+    if clean:
+        click.echo("Cleaning dist directory...")
+        if build_manager.clean_dist():
+            click.echo("  ✓ Cleaned dist directory")
+        else:
+            click.echo(click.style("  ✗ Failed to clean dist directory", fg='red'))
+
+    # Execute build
+    result = build_manager.build(commit=commit, force_rebuild=force)
+
+    if result.success:
+        click.echo(click.style("✓ Build completed successfully", fg='green'))
+        click.echo(f"  Duration: {result.duration:.2f} seconds")
+        click.echo(f"  Files built: {result.files_built}")
+        if result.cache_hit:
+            click.echo(f"  Cache: Retrieved from cache")
+        if result.dist_path:
+            click.echo(f"  Output: {result.dist_path}")
+    else:
+        click.echo(click.style("✗ Build failed", fg='red'))
+        click.echo(f"  Error: {result.error}")
+        ctx.exit(1)
+
+
+@cli.command()
+@click.option('--max-age', default=7, help='Maximum age in days for cache entries')
+@click.pass_context
+def clean_cache(ctx, max_age):
+    """Clean old build cache entries."""
+    config = ctx.obj['config']
+    build_manager = BuildManager(config)
+
+    if build_manager.cache:
+        click.echo(f"Cleaning cache entries older than {max_age} days...")
+        build_manager.cache.clean(max_age_days=max_age)
+        click.echo("  ✓ Cache cleaned")
+    else:
+        click.echo("Build caching is not enabled")
 
 
 def _display_results(results, detailed=False):

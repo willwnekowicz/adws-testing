@@ -63,7 +63,7 @@ class GitManager:
             logger.error(f"Failed to checkout {ref}: {e}")
             raise
 
-    def create_test_workspace(self, run_id: str, base_path: str = "./runs", use_temp_dir: bool = False) -> Path:
+    def create_test_workspace(self, run_id: str, base_path: str = "./runs", use_temp_dir: bool = False, use_dist: bool = False) -> Path:
         """Create an isolated workspace for testing.
 
         This creates a copy of the repository without .git directory
@@ -73,6 +73,7 @@ class GitManager:
             run_id: Unique run identifier
             base_path: Base directory for test runs
             use_temp_dir: If True, create workspace in system temp directory
+            use_dist: If True, copy from dist/ directory instead of repository root
 
         Returns:
             Path to the created workspace
@@ -99,11 +100,36 @@ class GitManager:
             workspace_path = Path(base_path) / run_id / "workspace"
             workspace_path.mkdir(parents=True, exist_ok=True)
 
-        # Copy the repository, excluding .git and other unwanted files
-        self._copy_repository(self.repo_path, workspace_path)
+        # Copy from dist directory if specified, otherwise copy repository
+        if use_dist:
+            dist_path = self.repo_path / "dist"
+            if not dist_path.exists():
+                raise ValueError(f"dist/ directory not found at {dist_path}. Build required before testing.")
+            self._copy_dist(dist_path, workspace_path)
+        else:
+            self._copy_repository(self.repo_path, workspace_path)
 
         logger.info(f"Created test workspace: {workspace_path}")
         return workspace_path
+
+    def _copy_dist(self, src: Path, dst: Path):
+        """Copy dist directory contents.
+
+        Args:
+            src: Source dist directory path
+            dst: Destination path
+        """
+        # Copy all contents from dist to workspace root
+        for item in src.iterdir():
+            src_item = src / item.name
+            dst_item = dst / item.name
+
+            if src_item.is_dir():
+                shutil.copytree(src_item, dst_item, dirs_exist_ok=True)
+            else:
+                shutil.copy2(src_item, dst_item)
+
+        logger.info(f"Copied dist contents to workspace: {dst}")
 
     def _copy_repository(self, src: Path, dst: Path):
         """Copy repository contents, excluding .git and other files.

@@ -13,6 +13,7 @@ from ..utils.artifacts import ArtifactManager
 from .config import Config
 from .git_manager import GitManager
 from .process_manager import ProcessManager
+from .build_manager import BuildManager
 from ..checks.base import CheckRegistry, CheckResult
 
 logger = logging.getLogger(__name__)
@@ -31,13 +32,15 @@ class TestRunner:
         self.db_manager = DatabaseManager(config.database.url)
         self.db_manager.create_tables()
         self.check_registry = CheckRegistry()
+        self.build_manager = BuildManager(config)
 
         logger.info("TestRunner initialized")
 
     def run_test(self, test_name: str, model: str,
                 commit: Optional[str] = None,
                 branch: Optional[str] = None,
-                checks: Optional[List[Any]] = None) -> str:
+                checks: Optional[List[Any]] = None,
+                build: Optional[bool] = None) -> str:
         """Run a single test.
 
         Args:
@@ -46,6 +49,7 @@ class TestRunner:
             commit: Specific commit to test (optional)
             branch: Specific branch to test (optional)
             checks: List of check instances to run
+            build: Whether to build before testing (None=auto-detect)
 
         Returns:
             Run ID
@@ -81,7 +85,19 @@ class TestRunner:
 
         test_logger.info(f"Testing commit: {test_commit}")
 
-        # Create run in database
+        # Determine whether to build
+        should_build = build
+        if should_build is None:
+            # Use configuration setting (default is True)
+            should_build = self.config.standard_configuration.build_required
+
+        if should_build:
+            # Check if build is actually needed
+            if not self.build_manager.needs_build():
+                test_logger.info("Build output already exists, skipping build")
+                should_build = False
+
+        # Create run in database first
         db_run_id = self.db_manager.create_run(
             commit_hash=test_commit,
             branch=branch or original_branch,
@@ -89,13 +105,46 @@ class TestRunner:
             config=self.config.to_dict()
         )
 
+        # Execute build if needed
+        build_result = None
+        build_id = None
+        if should_build:
+            test_logger.info("Executing build process...")
+            build_result = self.build_manager.build(commit=test_commit)
+
+            # Record build in database
+            build_status = 'success' if build_result.success else 'failed'
+            build_id = self.db_manager.add_build(
+                run_id=db_run_id,
+                commit_hash=test_commit,
+                build_script=self.config.standard_configuration.build_script,
+                status=build_status,
+                duration_seconds=build_result.duration,
+                output_path=str(build_result.dist_path) if build_result.dist_path else None,
+                error_message=build_result.error,
+                cache_hit=build_result.cache_hit,
+                files_built=build_result.files_built
+            )
+
+            if not build_result.success:
+                test_logger.error(f"Build failed: {build_result.error}")
+                self.db_manager.complete_run(db_run_id, "failed")
+                raise Exception(f"Build failed: {build_result.error}")
+
+            test_logger.info(f"Build completed successfully (cache_hit={build_result.cache_hit}, files={build_result.files_built})")
+            if build_result.cache_hit:
+                test_logger.info("Build was retrieved from cache")
+
         # Create test workspace
         # Use temp directory for project-init to ensure complete isolation
         use_temp = (test_name == "project-init")
+        # Always use dist directory (we ensure it exists via build)
+        use_dist = True
         workspace_path = git_manager.create_test_workspace(
             run_id,
             self.config.artifacts.base_path,
-            use_temp_dir=use_temp
+            use_temp_dir=use_temp,
+            use_dist=use_dist
         )
         test_logger.info(f"Created workspace: {workspace_path}")
 
@@ -219,7 +268,8 @@ class TestRunner:
                           models: Optional[List[str]] = None,
                           commit: Optional[str] = None,
                           branch: Optional[str] = None,
-                          checks: Optional[List[Any]] = None) -> List[str]:
+                          checks: Optional[List[Any]] = None,
+                          build: Optional[bool] = None) -> List[str]:
         """Run tests with multiple models.
 
         Args:
@@ -228,6 +278,7 @@ class TestRunner:
             commit: Specific commit to test
             branch: Specific branch to test
             checks: List of check instances to run
+            build: Whether to build before testing (None=auto-detect)
 
         Returns:
             List of run IDs
@@ -244,7 +295,8 @@ class TestRunner:
                     model=model,
                     commit=commit,
                     branch=branch,
-                    checks=checks
+                    checks=checks,
+                    build=build
                 )
                 run_ids.append(run_id)
             except Exception as e:

@@ -64,6 +64,13 @@ class LoggingConfig:
 class StandardConfigurationConfig:
     """Standard configuration project settings."""
     path: str = "~/ai/standard-configuration"
+    build_required: bool = True  # Always build before testing
+    build_script: str = "./scripts/build.sh"
+    source_path: str = "src"
+    dist_path: str = "dist"
+    build_timeout: int = 60  # seconds
+    cache_builds: bool = True
+    cache_dir: str = ".build-cache"
 
 
 class Config:
@@ -158,6 +165,13 @@ class Config:
             if "standard_configuration" in data:
                 sc_data = data["standard_configuration"]
                 self.standard_configuration.path = sc_data.get("path", self.standard_configuration.path)
+                self.standard_configuration.build_required = sc_data.get("build_required", self.standard_configuration.build_required)
+                self.standard_configuration.build_script = sc_data.get("build_script", self.standard_configuration.build_script)
+                self.standard_configuration.source_path = sc_data.get("source_path", self.standard_configuration.source_path)
+                self.standard_configuration.dist_path = sc_data.get("dist_path", self.standard_configuration.dist_path)
+                self.standard_configuration.build_timeout = sc_data.get("build_timeout", self.standard_configuration.build_timeout)
+                self.standard_configuration.cache_builds = sc_data.get("cache_builds", self.standard_configuration.cache_builds)
+                self.standard_configuration.cache_dir = sc_data.get("cache_dir", self.standard_configuration.cache_dir)
 
             logger.info(f"Configuration loaded from {config_file}")
 
@@ -351,6 +365,13 @@ class Config:
                 "format": self.logging.format
             },
             "standard_configuration": {
-                "path": self.standard_configuration.path
+                "path": self.standard_configuration.path,
+                "build_required": self.standard_configuration.build_required,
+                "build_script": self.standard_configuration.build_script,
+                "source_path": self.standard_configuration.source_path,
+                "dist_path": self.standard_configuration.dist_path,
+                "build_timeout": self.standard_configuration.build_timeout,
+                "cache_builds": self.standard_configuration.cache_builds,
+                "cache_dir": self.standard_configuration.cache_dir
             }
         }
