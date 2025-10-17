@@ -2,6 +2,36 @@
 
 A comprehensive testing harness for the standard-configuration project. This framework enables automated testing of Claude-based agents with support for multiple models, process monitoring, and both simple and LLM-based evaluations.
 
+## ⚠️ IMPORTANT: Testing Framework Scope
+
+**This is a TESTING framework only. It must NOT modify the code it is testing.**
+
+### Strict Boundaries
+
+This framework has READ access to the standard-configuration repository for testing purposes, but it must:
+
+- ✅ **TEST** the code and report results
+- ✅ **VALIDATE** that commands work as expected
+- ✅ **REPORT** failures and issues found
+- ✅ **DOCUMENT** test results and findings
+
+It must NOT:
+
+- ❌ **FIX** bugs in the code being tested
+- ❌ **MODIFY** the standard-configuration repository
+- ❌ **UPDATE** slash commands or agent definitions
+- ❌ **CHANGE** any code outside the testing framework itself
+
+### Reporting Issues
+
+When tests fail, the framework should:
+1. Document the failure clearly in test results
+2. Provide detailed error messages and logs
+3. Create reproducible test cases
+4. Report issues to maintainers (do NOT fix them)
+
+If you discover a bug in the code being tested, report it - don't fix it. The testing framework's job is to find problems, not solve them.
+
 ## Features
 
 - **Multi-Model Testing**: Test with Claude 4.5 Sonnet and Haiku models
@@ -322,8 +352,9 @@ Uses psutil to track all spawned processes, ensuring cleanup and preventing orph
    - This flag is required for automated testing
 
 2. **Git branch tests fail (missing main branch)**
-   - Fixed in latest version - ensure project-init.md includes initial commit
-   - The framework now creates an empty commit to establish branches properly
+   - This indicates the project-init command may not be creating both branches
+   - Check test logs to see which branches were created
+   - Report the issue if the command doesn't match its specification
 
 3. **Workspace conflicts with parent repository**
    - Framework uses temp directories for complete isolation
