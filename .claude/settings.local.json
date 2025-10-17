@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/william/ai/standard-configuration/**)",
+      "Bash(pip3 list:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

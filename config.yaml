@@ -1,0 +1,34 @@
+# ADWS Testing Configuration
+
+database:
+  url: "sqlite:///test_runs.db"
+
+standard_configuration:
+  path: "~/ai/standard-configuration"
+
+claude:
+  command: "claude"
+  models:
+    sonnet: "claude-3-5-sonnet-latest"
+    haiku: "claude-3-5-haiku-latest"
+  default_model: "claude-3-5-sonnet-latest"
+  default_args:
+    - "--stream-json"
+    - "--verbose"
+    - "-p"
+
+# LLM judge configuration (separate from test execution)
+openai:
+  api_key: "${OPENAI_API_KEY}"
+  judge_model: "gpt-4o-mini"
+
+process:
+  max_wait_time: 300  # seconds
+  poll_interval: 1     # seconds
+
+artifacts:
+  base_path: "./runs"
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
