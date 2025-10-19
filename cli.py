@@ -14,6 +14,7 @@ from src.core.config import Config
 from src.core.runner import TestRunner
 from src.core.build_manager import BuildManager
 from tests.test_project_init import get_project_init_checks
+from tests.test_adw_init import get_adw_init_checks
 
 
 @click.group()
@@ -34,15 +35,17 @@ def cli(ctx, config):
 
 
 @cli.command()
-@click.argument('test_name', type=click.Choice(['project-init', 'all']))
+@click.argument('test_name', type=click.Choice(['project-init', 'adw-init', 'all']))
 @click.option('--model', type=click.Choice(['sonnet', 'haiku']), help='Specific model to test')
 @click.option('--models', help='Comma-separated list of models to test')
 @click.option('--commit', help='Specific commit to test')
 @click.option('--branch', help='Specific branch to test')
 @click.option('--build/--no-build', default=None, help='Build before testing (default: auto-detect)')
+@click.option('--dry-run', is_flag=True, help='Run ADW in dry-run mode (ADW tests only)')
+@click.option('--adw-args', help='Arguments to pass to ADW script (comma-separated)')
 @click.option('--json', 'output_json', is_flag=True, help='Output results as JSON')
 @click.pass_context
-def test(ctx, test_name, model, models, commit, branch, build, output_json):
+def test(ctx, test_name, model, models, commit, branch, build, dry_run, adw_args, output_json):
     """Run a test case."""
     config = ctx.obj['config']
     runner = TestRunner(config)
@@ -55,9 +58,18 @@ def test(ctx, test_name, model, models, commit, branch, build, output_json):
     else:
         models_to_test = list(config.claude.models.keys())
 
+    # Parse ADW arguments if provided
+    parsed_adw_args = None
+    if adw_args:
+        parsed_adw_args = [arg.strip() for arg in adw_args.split(',')]
+
     # Get checks based on test name
     if test_name == 'project-init':
         checks = get_project_init_checks()
+    elif test_name == 'adw-init':
+        # For ADW tests, checks will be constructed with results after execution
+        # Use placeholder for now
+        checks = get_adw_init_checks()
     elif test_name == 'all':
         # Run all tests
         click.echo("Running all tests...")
@@ -73,6 +85,10 @@ def test(ctx, test_name, model, models, commit, branch, build, output_json):
         click.echo(f"Commit: {commit}")
     if branch:
         click.echo(f"Branch: {branch}")
+    if dry_run:
+        click.echo("Mode: DRY-RUN")
+    if parsed_adw_args:
+        click.echo(f"ADW Args: {parsed_adw_args}")
     click.echo("")
 
     run_ids = []
@@ -85,7 +101,9 @@ def test(ctx, test_name, model, models, commit, branch, build, output_json):
                 commit=commit,
                 branch=branch,
                 checks=checks,
-                build=build
+                build=build,
+                dry_run=dry_run,
+                adw_args=parsed_adw_args
             )
             run_ids.append(run_id)
 

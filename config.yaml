@@ -34,3 +34,10 @@ artifacts:
 logging:
   level: "INFO"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# ADW (AI Developer Workflow) test execution configuration
+adw:
+  adw_directory: "dist/.adws"  # Path to ADWs in dist directory
+  python_version: "3.13"       # Python version for uv run
+  uv_command: "uv"              # Command to run uv
+  adw_timeout: 600              # Max execution time for ADWs (seconds)

@@ -156,6 +156,25 @@ python cli.py test project-init --commit abc123
 python cli.py test project-init --branch feature-branch
 ```
 
+### Running ADW Tests
+
+ADW (AI Developer Workflow) tests are integration tests that validate complete workflows. Unlike slash command tests (which are unit tests), ADW tests execute Python scripts that orchestrate one or more slash commands.
+
+Run the adw-init test:
+```bash
+python cli.py test adw-init --model sonnet
+```
+
+Run with dry-run mode:
+```bash
+python cli.py test adw-init --dry-run
+```
+
+Pass arguments to the ADW script:
+```bash
+python cli.py test adw-init --adw-args "my-project-name"
+```
+
 ### Viewing Results
 
 List recent runs:
@@ -208,7 +227,33 @@ Checks performed:
 - `execution_time` - Ensures completion within 2 minutes
 - `project_init_complete` - Composite check for overall success
 
+### ADW-Init Test
+
+The `adw-init` test validates the `adw_init.py` workflow script that orchestrates the `/project-init` slash command:
+
+1. Executes the ADW Python script via `uv run`
+2. Verifies the script has valid Python syntax
+3. Confirms Claude CLI was executed by the ADW
+4. Validates all project-init outcomes (README, git setup, branches)
+
+This is an **integration test** - it tests the complete workflow from Python script through to final project state.
+
+### Test Types
+
+The framework distinguishes between two test types:
+
+- **Unit Tests** (Slash Commands): Test individual slash commands directly via Claude CLI
+  - Example: `test project-init`
+  - Stored in database as `test_type = "slash_command"`
+
+- **Integration Tests** (ADWs): Test workflow scripts that orchestrate slash commands
+  - Example: `test adw-init`
+  - Stored in database as `test_type = "adw"`
+  - Include ADW-specific metadata (Python version, script execution status, etc.)
+
 ### Creating New Tests
+
+#### Creating Slash Command Tests
 
 1. Create a new test file in `tests/`:
 ```python
@@ -221,15 +266,41 @@ def get_my_test_checks():
     ]
 ```
 
-2. Register the test in the CLI or runner.
+2. Register the test in the CLI.
+
+#### Creating ADW Tests
+
+1. Create a new ADW test by extending `BaseAdwTest`:
+```python
+from tests.base_adw_test import BaseAdwTest
+from src.checks.adw import AdwExecutionCheck
+
+class MyAdwTest(BaseAdwTest):
+    def get_adw_name(self) -> str:
+        return "adw_my_workflow.py"
+
+    def get_adw_args(self) -> List[str]:
+        return ["arg1", "arg2"]
+
+    def get_specific_checks(self) -> List[BaseCheck]:
+        return [
+            # Your workflow-specific checks
+        ]
+```
+
+2. Add the test to `cli.py` test choices
+
+3. Create a `get_my_adw_checks()` function for the CLI to use
 
 ## Architecture
 
 ### Core Components
 
-- **TestRunner**: Orchestrates test execution
+- **TestRunner**: Orchestrates test execution for both slash commands and ADWs
+- **AdwRunner**: Executes ADW Python scripts via uv
 - **GitManager**: Handles repository operations
 - **ProcessManager**: Tracks background processes
+- **BuildManager**: Manages building the dist directory before tests
 - **Config**: Configuration management
 - **DatabaseManager**: SQLAlchemy-based persistence
 
@@ -237,15 +308,19 @@ def get_my_test_checks():
 
 - **BaseCheck**: Abstract base for all checks
 - **SimpleCheck**: File, git, and content validations
+- **AdwCheck**: ADW-specific validations (script validity, execution, output)
 - **LLMJudge**: OpenAI-powered evaluations
 - **CompositeCheck**: Combine multiple checks
 
 ### Database Schema
 
 - **runs**: Test run metadata
-- **test_cases**: Individual test cases
+- **test_cases**: Individual test cases (with `test_type`: slash_command or adw)
 - **test_results**: Check results
 - **process_logs**: Process tracking
+- **builds**: Build operation tracking
+- **adw_tests**: ADW-specific test metadata
+- **workflow_steps**: Multi-step workflow tracking (for future complex ADWs)
 
 ## Development
 

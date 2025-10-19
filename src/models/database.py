@@ -41,6 +41,7 @@ class TestCase(Base):
     run_id = Column(String(36), ForeignKey('runs.id'), nullable=False)
     name = Column(String(200), nullable=False)
     command = Column(Text, nullable=False)
+    test_type = Column(String(20), default='slash_command')  # slash_command, adw
     status = Column(String(20), default='pending')  # pending, running, passed, failed
     duration = Column(Float, nullable=True)  # seconds
     start_time = Column(DateTime, nullable=True)
@@ -50,6 +51,7 @@ class TestCase(Base):
     run = relationship("Run", back_populates="test_cases")
     results = relationship("TestResult", back_populates="test_case", cascade="all, delete-orphan")
     process_logs = relationship("ProcessLog", back_populates="test_case", cascade="all, delete-orphan")
+    adw_test = relationship("AdwTest", back_populates="test_case", cascade="all, delete-orphan", uselist=False)
 
 
 class TestResult(Base):
@@ -121,6 +123,42 @@ class BuildArtifact(Base):
 
     # Relationships
     build = relationship("Build", back_populates="artifacts")
+
+
+class AdwTest(Base):
+    """Tracks ADW (AI Developer Workflow) test execution."""
+    __tablename__ = 'adw_tests'
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    test_case_id = Column(String(36), ForeignKey('test_cases.id'), nullable=False)
+    adw_script_name = Column(String(200), nullable=False)  # e.g., "adw_init.py"
+    python_version = Column(String(20), nullable=True)  # Python version used
+    script_execution_status = Column(String(20), nullable=True)  # success, failed
+    claude_execution_status = Column(String(20), nullable=True)  # success, failed, not_run
+    dry_run = Column(Boolean, default=False)  # Was this a dry run
+    script_output_path = Column(Text, nullable=True)  # Path to script output
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    test_case = relationship("TestCase", back_populates="adw_test")
+    workflow_steps = relationship("WorkflowStep", back_populates="adw_test", cascade="all, delete-orphan")
+
+
+class WorkflowStep(Base):
+    """Tracks individual steps within an ADW workflow."""
+    __tablename__ = 'workflow_steps'
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    adw_test_id = Column(String(36), ForeignKey('adw_tests.id'), nullable=False)
+    step_number = Column(Integer, nullable=False)  # Order of execution
+    step_name = Column(String(200), nullable=False)  # e.g., "/project-init"
+    status = Column(String(20), default='pending')  # pending, running, completed, failed
+    duration = Column(Float, nullable=True)  # seconds
+    output = Column(Text, nullable=True)  # Step output
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    adw_test = relationship("AdwTest", back_populates="workflow_steps")
 
 
 class DatabaseManager:
@@ -338,5 +376,91 @@ class DatabaseManager:
             session.add(artifact)
             session.commit()
             return artifact.id
+        finally:
+            session.close()
+
+    def add_adw_test(self, test_case_id: str, adw_script_name: str,
+                     python_version: Optional[str] = None,
+                     script_execution_status: Optional[str] = None,
+                     claude_execution_status: Optional[str] = None,
+                     dry_run: bool = False,
+                     script_output_path: Optional[str] = None) -> str:
+        """Add an ADW test record.
+
+        Args:
+            test_case_id: Test case ID
+            adw_script_name: Name of ADW script (e.g., "adw_init.py")
+            python_version: Python version used for execution
+            script_execution_status: Script execution status
+            claude_execution_status: Claude execution status
+            dry_run: Whether this was a dry run
+            script_output_path: Path to script output file
+
+        Returns:
+            ADW test ID
+        """
+        session = self.get_session()
+        try:
+            adw_test = AdwTest(
+                test_case_id=test_case_id,
+                adw_script_name=adw_script_name,
+                python_version=python_version,
+                script_execution_status=script_execution_status,
+                claude_execution_status=claude_execution_status,
+                dry_run=dry_run,
+                script_output_path=script_output_path
+            )
+            session.add(adw_test)
+            session.commit()
+            return adw_test.id
+        finally:
+            session.close()
+
+    def add_workflow_step(self, adw_test_id: str, step_number: int,
+                         step_name: str, status: str = 'pending',
+                         duration: Optional[float] = None,
+                         output: Optional[str] = None) -> str:
+        """Add a workflow step record.
+
+        Args:
+            adw_test_id: ADW test ID
+            step_number: Step order number
+            step_name: Name of the step (e.g., "/project-init")
+            status: Step status
+            duration: Step duration in seconds
+            output: Step output
+
+        Returns:
+            Workflow step ID
+        """
+        session = self.get_session()
+        try:
+            step = WorkflowStep(
+                adw_test_id=adw_test_id,
+                step_number=step_number,
+                step_name=step_name,
+                status=status,
+                duration=duration,
+                output=output
+            )
+            session.add(step)
+            session.commit()
+            return step.id
+        finally:
+            session.close()
+
+    def update_test_case_type(self, test_case_id: str, test_type: str):
+        """Update the test type for a test case.
+
+        Args:
+            test_case_id: Test case ID
+            test_type: Test type ('slash_command' or 'adw')
+        """
+        session = self.get_session()
+        try:
+            test_case = session.query(TestCase).filter_by(id=test_case_id).first()
+            if test_case:
+                test_case.test_type = test_type
+                session.commit()
         finally:
             session.close()

@@ -73,6 +73,15 @@ class StandardConfigurationConfig:
     cache_dir: str = ".build-cache"
 
 
+@dataclass
+class AdwConfig:
+    """ADW (AI Developer Workflow) test execution configuration."""
+    adw_directory: str = "dist/.adws"  # Path to ADWs in dist directory
+    python_version: str = "3.13"       # Python version for uv run
+    uv_command: str = "uv"              # Command to run uv
+    adw_timeout: int = 600              # Max execution time for ADWs (seconds)
+
+
 class Config:
     """Main configuration manager."""
 
@@ -93,6 +102,7 @@ class Config:
         self.artifacts = ArtifactsConfig()
         self.logging = LoggingConfig()
         self.standard_configuration = StandardConfigurationConfig()
+        self.adw = AdwConfig()
 
         # Load from config file if provided
         if config_file:
@@ -172,6 +182,14 @@ class Config:
                 self.standard_configuration.build_timeout = sc_data.get("build_timeout", self.standard_configuration.build_timeout)
                 self.standard_configuration.cache_builds = sc_data.get("cache_builds", self.standard_configuration.cache_builds)
                 self.standard_configuration.cache_dir = sc_data.get("cache_dir", self.standard_configuration.cache_dir)
+
+            # Update ADW configuration
+            if "adw" in data:
+                adw_data = data["adw"]
+                self.adw.adw_directory = adw_data.get("adw_directory", self.adw.adw_directory)
+                self.adw.python_version = adw_data.get("python_version", self.adw.python_version)
+                self.adw.uv_command = adw_data.get("uv_command", self.adw.uv_command)
+                self.adw.adw_timeout = adw_data.get("adw_timeout", self.adw.adw_timeout)
 
             logger.info(f"Configuration loaded from {config_file}")
 
@@ -331,6 +349,10 @@ class Config:
         if not shutil.which(self.claude.command):
             errors.append(f"Claude command not found in PATH: {self.claude.command}")
 
+        # Check uv command is available (for ADW tests)
+        if not shutil.which(self.adw.uv_command):
+            errors.append(f"uv command not found in PATH: {self.adw.uv_command} (required for ADW tests)")
+
         return errors
 
     def to_dict(self) -> Dict[str, Any]:
@@ -373,5 +395,11 @@ class Config:
                 "build_timeout": self.standard_configuration.build_timeout,
                 "cache_builds": self.standard_configuration.cache_builds,
                 "cache_dir": self.standard_configuration.cache_dir
+            },
+            "adw": {
+                "adw_directory": self.adw.adw_directory,
+                "python_version": self.adw.python_version,
+                "uv_command": self.adw.uv_command,
+                "adw_timeout": self.adw.adw_timeout
             }
         }
