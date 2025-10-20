@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from src.core.config import Config
 from src.core.runner import TestRunner
 from src.core.build_manager import BuildManager
-from tests.test_project_init import get_project_init_checks
+from tests.test_init_git import get_init_git_checks
 from tests.test_adw_init import get_adw_init_checks
 
 
@@ -35,7 +35,7 @@ def cli(ctx, config):
 
 
 @cli.command()
-@click.argument('test_name', type=click.Choice(['project-init', 'adw-init', 'all']))
+@click.argument('test_name', type=click.Choice(['init-git', 'adw-init', 'all']))
 @click.option('--model', type=click.Choice(['sonnet', 'haiku']), help='Specific model to test')
 @click.option('--models', help='Comma-separated list of models to test')
 @click.option('--commit', help='Specific commit to test')
@@ -64,8 +64,8 @@ def test(ctx, test_name, model, models, commit, branch, build, dry_run, adw_args
         parsed_adw_args = [arg.strip() for arg in adw_args.split(',')]
 
     # Get checks based on test name
-    if test_name == 'project-init':
-        checks = get_project_init_checks()
+    if test_name == 'init-git':
+        checks = get_init_git_checks()
     elif test_name == 'adw-init':
         # For ADW tests, checks will be constructed with results after execution
         # Use placeholder for now
@@ -73,7 +73,7 @@ def test(ctx, test_name, model, models, commit, branch, build, dry_run, adw_args
     elif test_name == 'all':
         # Run all tests
         click.echo("Running all tests...")
-        checks = get_project_init_checks()  # Add more as implemented
+        checks = get_init_git_checks()  # Add more as implemented
     else:
         click.echo(f"Unknown test: {test_name}")
         ctx.exit(1)
@@ -96,7 +96,7 @@ def test(ctx, test_name, model, models, commit, branch, build, dry_run, adw_args
         click.echo(f"Testing with {model_name}...")
         try:
             run_id = runner.run_test(
-                test_name=test_name if test_name != 'all' else 'project-init',
+                test_name=test_name if test_name != 'all' else 'init-git',
                 model=model_name,
                 commit=commit,
                 branch=branch,
@@ -237,7 +237,7 @@ def init(ctx):
         click.echo("  ⚠ Alembic not found, skipping migrations")
 
     click.echo("\nInitialization complete!")
-    click.echo("Run 'adws-test test project-init' to run your first test.")
+    click.echo("Run 'adws-test test init-git' to run your first test.")
 
 
 @cli.command()

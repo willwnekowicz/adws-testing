@@ -1,4 +1,4 @@
-"""Test case for the /project-init slash command."""
+"""Test case for the /init-git slash command."""
 
 import sys
 from pathlib import Path
@@ -19,8 +19,8 @@ from src.checks.simple import (
 from src.checks.base import CompositeCheck
 
 
-def get_project_init_checks():
-    """Get checks for project-init test.
+def get_init_git_checks():
+    """Get checks for init-git test.
 
     Returns:
         List of check instances
@@ -67,22 +67,22 @@ def get_project_init_checks():
         max_duration=120  # 2 minutes max
     ))
 
-    # Create a composite check for project initialization
-    project_init_complete = CompositeCheck(
-        name="project_init_complete",
+    # Create a composite check for git initialization
+    init_git_complete = CompositeCheck(
+        name="init_git_complete",
         checks=[
             FileExistsCheck("readme_check", "README.md"),
             GitBranchCheck("branch_check", "staging")
         ],
         require_all=True
     )
-    checks.append(project_init_complete)
+    checks.append(init_git_complete)
 
     return checks
 
 
-def run_project_init_test(config_path: str = None):
-    """Run the project-init test.
+def run_init_git_test(config_path: str = None):
+    """Run the init-git test.
 
     Args:
         config_path: Optional path to configuration file
@@ -105,12 +105,12 @@ def run_project_init_test(config_path: str = None):
     runner = TestRunner(config)
 
     # Get checks
-    checks = get_project_init_checks()
+    checks = get_init_git_checks()
 
     # Run tests with both models
-    print("Running project-init test...")
+    print("Running init-git test...")
     run_ids = runner.run_multiple_tests(
-        test_name="project-init",
+        test_name="init-git",
         models=["sonnet", "haiku"],
         checks=checks
     )
@@ -139,7 +139,7 @@ def run_project_init_test(config_path: str = None):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Run project-init test")
+    parser = argparse.ArgumentParser(description="Run init-git test")
     parser.add_argument(
         "--config",
         help="Path to configuration file",
@@ -173,13 +173,13 @@ if __name__ == "__main__":
         runner = TestRunner(config)
 
         # Get checks
-        checks = get_project_init_checks()
+        checks = get_init_git_checks()
 
         # Run test
         if args.model:
             # Run with specific model
             run_id = runner.run_test(
-                test_name="project-init",
+                test_name="init-git",
                 model=args.model,
                 commit=args.commit,
                 branch=args.branch,
@@ -214,7 +214,7 @@ if __name__ == "__main__":
         else:
             # Run with all models
             run_ids = runner.run_multiple_tests(
-                test_name="project-init",
+                test_name="init-git",
                 commit=args.commit,
                 branch=args.branch,
                 checks=checks

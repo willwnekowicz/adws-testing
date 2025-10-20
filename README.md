@@ -139,41 +139,43 @@ export STANDARD_CONFIG_PATH="~/ai/standard-configuration"  # Optional override
 
 ### Running Tests
 
-Run the project-init test with both models:
+Run the init-git test with both models:
 ```bash
-python cli.py test project-init
+python cli.py test init-git
 ```
 
 Run with a specific model:
 ```bash
-python cli.py test project-init --model sonnet
-python cli.py test project-init --model haiku
+python cli.py test init-git --model sonnet
+python cli.py test init-git --model haiku
 ```
 
 Test a specific commit or branch:
 ```bash
-python cli.py test project-init --commit abc123
-python cli.py test project-init --branch feature-branch
+python cli.py test init-git --commit abc123
+python cli.py test init-git --branch feature-branch
 ```
 
 ### Running ADW Tests
 
 ADW (AI Developer Workflow) tests are integration tests that validate complete workflows. Unlike slash command tests (which are unit tests), ADW tests execute Python scripts that orchestrate one or more slash commands.
 
-Run the adw-init test:
+Run the adw-init test (requires a project name):
 ```bash
-python cli.py test adw-init --model sonnet
+python cli.py test adw-init --model sonnet --adw-args "test-project"
 ```
 
-Run with dry-run mode:
+Run with a custom project name:
 ```bash
-python cli.py test adw-init --dry-run
+python cli.py test adw-init --model sonnet --adw-args "my-project-name"
 ```
 
-Pass arguments to the ADW script:
+Run with dry-run mode (still requires project name):
 ```bash
-python cli.py test adw-init --adw-args "my-project-name"
+python cli.py test adw-init --model sonnet --dry-run --adw-args "test-project"
 ```
+
+**Note:** The `--adw-args` parameter is **required** for the adw-init test as it specifies the project name to create.
 
 ### Viewing Results
 
@@ -207,9 +209,9 @@ Tests run in completely isolated environments:
 - Symlinks in `runs/` directory provide easy access to workspaces
 - Each test gets a fresh, uncontaminated workspace
 
-### Project-Init Test
+### Init-Git Test
 
-The included `project-init` test validates that the `/project-init` slash command correctly:
+The included `init-git` test validates that the `/init-git` slash command correctly:
 
 1. Creates a README.md file with project structure
 2. Initializes a git repository
@@ -225,25 +227,30 @@ Checks performed:
 - `git_branches_configured` - Validates both main and staging branches exist
 - `on_staging_branch` - Confirms current branch is staging
 - `execution_time` - Ensures completion within 2 minutes
-- `project_init_complete` - Composite check for overall success
+- `init_git_complete` - Composite check for overall success
 
 ### ADW-Init Test
 
-The `adw-init` test validates the `adw_init.py` workflow script that orchestrates the `/project-init` slash command:
+The `adw-init` test validates the `adw_init.py` workflow script that orchestrates the `/init-git` and `/init-structure` slash commands:
 
-1. Executes the ADW Python script via `uv run`
+1. Executes the ADW Python script via `uv run` with a project name argument
 2. Verifies the script has valid Python syntax
 3. Confirms Claude CLI was executed by the ADW
-4. Validates all project-init outcomes (README, git setup, branches)
+4. Validates Phase 1 (/init-git): README, git setup, branches
+5. Validates Phase 2 (/init-structure): Directory structure creation
 
 This is an **integration test** - it tests the complete workflow from Python script through to final project state.
+
+**Requirements:**
+- Must pass a project name via `--adw-args "project-name"`
+- Example: `python cli.py test adw-init --model sonnet --adw-args "test-project"`
 
 ### Test Types
 
 The framework distinguishes between two test types:
 
 - **Unit Tests** (Slash Commands): Test individual slash commands directly via Claude CLI
-  - Example: `test project-init`
+  - Example: `test init-git`
   - Stored in database as `test_type = "slash_command"`
 
 - **Integration Tests** (ADWs): Test workflow scripts that orchestrate slash commands

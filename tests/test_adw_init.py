@@ -1,7 +1,7 @@
 """Test case for the adw_init.py ADW script.
 
 This test validates that the adw_init ADW (AI Developer Workflow) correctly
-orchestrates the /project-init slash command to set up new projects.
+orchestrates the /init-git and /init-structure slash commands to set up new projects.
 
 This is an integration test, testing the complete workflow from ADW script
 execution through to final project state.
@@ -31,11 +31,15 @@ from src.checks.adw import (
     ClaudeExecutionCheck
 )
 from tests.base_adw_test import BaseAdwTest, run_adw_test_standalone
-from tests.test_project_init import get_project_init_checks
+from tests.test_init_git import get_init_git_checks
 
 
 def get_adw_init_checks(adw_result=None, script_path=None):
     """Get checks for adw_init test.
+
+    This validates the two-phase initialization workflow:
+    - Phase 1: /init-git (git setup, README, branches)
+    - Phase 2: /init-structure (directory structure, documentation)
 
     Args:
         adw_result: AdwResult instance from execution
@@ -46,7 +50,11 @@ def get_adw_init_checks(adw_result=None, script_path=None):
     """
     checks = []
 
-    # ADW-specific checks
+    # ============================================================================
+    # SECTION 1: ADW-specific checks
+    # ============================================================================
+    # These validate that the ADW script itself is valid and executed correctly
+
     if script_path:
         checks.append(PythonScriptValidityCheck(
             name="adw_script_valid",
@@ -71,16 +79,84 @@ def get_adw_init_checks(adw_result=None, script_path=None):
             not_contains=["Error", "Failed", "Exception"]  # Should not have errors
         ))
 
-    # Include all project-init checks to validate final state
-    # These checks validate that the ADW correctly executed /project-init
-    project_checks = get_project_init_checks()
-    checks.extend(project_checks)
+    # ============================================================================
+    # SECTION 2: Init-git checks
+    # ============================================================================
+    # These validate that the ADW correctly executed /init-git
+    # (git initialization, main README, branches, etc.)
+
+    init_git_checks = get_init_git_checks()
+    checks.extend(init_git_checks)
+
+    # ============================================================================
+    # SECTION 3: Directory structure checks
+    # ============================================================================
+    # These validate that /init-structure created all expected directories
+
+    checks.append(DirectoryStructureCheck(
+        name="directory_structure_created",
+        required_dirs=[
+            "documentation",
+            "documentation/research",
+            "documentation/brainstorming",
+            "documentation/specs",
+            "documentation/implementations",
+            "scripts",
+            "apps",
+            "apps/client",
+            "apps/server"
+        ]
+    ))
+
+    # ============================================================================
+    # SECTION 4: README file checks
+    # ============================================================================
+    # These validate that README files exist in key directories
+
+    checks.append(FileExistsCheck(
+        name="documentation_readme_exists",
+        file_path="documentation/README.md"
+    ))
+
+    checks.append(FileExistsCheck(
+        name="scripts_readme_exists",
+        file_path="scripts/README.md"
+    ))
+
+    checks.append(FileExistsCheck(
+        name="apps_readme_exists",
+        file_path="apps/README.md"
+    ))
+
+    # ============================================================================
+    # SECTION 5: Integration checks
+    # ============================================================================
+    # These validate that /init-structure properly integrated with /init-git
+    # by updating the main README to document the new structure
+
+    checks.append(FileContentCheck(
+        name="main_readme_documents_structure",
+        file_path="README.md",
+        contains=[
+            "Project Structure",
+            "documentation/",
+            "scripts/",
+            "apps/"
+        ]
+    ))
 
     return checks
 
 
 class AdwInitTest(BaseAdwTest):
-    """Test class for adw_init.py workflow."""
+    """Test class for adw_init.py workflow.
+
+    This test validates the two-phase initialization workflow:
+    - Phase 1: /init-git (git initialization, README, branches)
+    - Phase 2: /init-structure (directory structure, README files)
+
+    The test ensures both phases execute successfully and integrate properly.
+    """
 
     def __init__(self, config: Config, project_name: str = "test-project"):
         """Initialize the test.
@@ -112,7 +188,11 @@ class AdwInitTest(BaseAdwTest):
         """Get ADW-init specific checks.
 
         These are checks specific to the adw_init workflow beyond
-        the standard ADW checks and project-init checks.
+        the standard ADW checks and init-git checks.
+
+        Note: The main validation checks (including directory structure,
+        README files, and integration checks) are defined in the
+        get_adw_init_checks() function for reusability.
 
         Returns:
             List of check instances
@@ -120,8 +200,10 @@ class AdwInitTest(BaseAdwTest):
         checks = []
 
         # Additional checks specific to adw_init
-        # (Currently adw_init just wraps project-init, so project-init checks cover it)
-        # Future: Add checks for ADW-specific features like progress indicators, etc.
+        # The main checks are in get_adw_init_checks() which includes:
+        # - Directory structure validation (9 directories)
+        # - README file existence checks (documentation, scripts, apps)
+        # - Integration checks (main README documents structure)
 
         return checks
 
@@ -138,6 +220,9 @@ class AdwInitTest(BaseAdwTest):
     def validate_project_outcome(self, workspace: Path) -> bool:
         """Validate the final project state.
 
+        This provides early validation before detailed checks run.
+        Validates both /init-git and /init-structure outcomes.
+
         Args:
             workspace: Path to workspace directory
 
@@ -146,18 +231,33 @@ class AdwInitTest(BaseAdwTest):
         """
         # Check workspace exists
         if not workspace.exists():
+            print("✗ Workspace does not exist")
             return False
 
-        # Check key project files exist
+        # Check key project files exist (from /init-git)
         readme = workspace / "README.md"
         git_dir = workspace / ".git"
 
         if not readme.exists():
+            print("✗ Main README.md does not exist")
             return False
 
         if not git_dir.exists():
+            print("✗ Git directory does not exist")
             return False
 
+        # Check critical directory structure (from /init-structure)
+        critical_dirs = ["documentation", "scripts", "apps"]
+        for dir_name in critical_dirs:
+            dir_path = workspace / dir_name
+            if not dir_path.exists():
+                print(f"✗ Critical directory missing: {dir_name}/")
+                return False
+            if not dir_path.is_dir():
+                print(f"✗ Expected directory but found file: {dir_name}")
+                return False
+
+        print("✓ Basic project structure validation passed")
         return True
 
 
@@ -185,8 +285,8 @@ def run_adw_init_test(config_path: str = None):
     runner = TestRunner(config)
 
     # Get checks - we'll populate these after ADW execution
-    # For now, use project-init checks as baseline
-    checks = get_project_init_checks()
+    # For now, use init-git checks as baseline
+    checks = get_init_git_checks()
 
     print("Running adw-init test...")
     # Note: This will be integrated with the runner in the next step
