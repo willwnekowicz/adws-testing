@@ -342,6 +342,16 @@ class TestRunner:
                 model=model,
                 additional_args=["--", "/project-init"]
             )
+        elif test_name == "init-git":
+            command = self.config.get_claude_command(
+                model=model,
+                additional_args=["--", "/init-git"]
+            )
+        elif test_name == "init-cloudflare":
+            command = self.config.get_claude_command(
+                model=model,
+                additional_args=["--", "/init-cloudflare"]
+            )
         else:
             # Add other test commands as needed
             command = self.config.get_claude_command(model=model)

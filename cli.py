@@ -15,6 +15,7 @@ from src.core.runner import TestRunner
 from src.core.build_manager import BuildManager
 from tests.test_init_git import get_init_git_checks
 from tests.test_adw_init import get_adw_init_checks
+from tests.test_init_cloudflare import get_init_cloudflare_checks
 
 
 @click.group()
@@ -35,7 +36,7 @@ def cli(ctx, config):
 
 
 @cli.command()
-@click.argument('test_name', type=click.Choice(['init-git', 'adw-init', 'all']))
+@click.argument('test_name', type=click.Choice(['init-git', 'init-cloudflare', 'adw-init', 'all']))
 @click.option('--model', type=click.Choice(['sonnet', 'haiku']), help='Specific model to test')
 @click.option('--models', help='Comma-separated list of models to test')
 @click.option('--commit', help='Specific commit to test')
@@ -66,6 +67,8 @@ def test(ctx, test_name, model, models, commit, branch, build, dry_run, adw_args
     # Get checks based on test name
     if test_name == 'init-git':
         checks = get_init_git_checks()
+    elif test_name == 'init-cloudflare':
+        checks = get_init_cloudflare_checks()
     elif test_name == 'adw-init':
         # For ADW tests, checks will be constructed with results after execution
         # Use placeholder for now
