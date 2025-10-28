@@ -375,6 +375,97 @@ class DirectoryStructureCheck(BaseCheck):
         )
 
 
+class GitCleanCheck(BaseCheck):
+    """Check that git repository is in a clean state (no untracked/uncommitted files)."""
+
+    def __init__(self, name: str, allow_untracked: bool = False):
+        """Initialize git clean check.
+
+        Args:
+            name: Check name
+            allow_untracked: If True, allow untracked files (only check for uncommitted changes)
+        """
+        super().__init__(name, CheckType.SIMPLE)
+        self.allow_untracked = allow_untracked
+
+    def execute(self, **kwargs) -> CheckResult:
+        """Check if git repository is clean."""
+        if not self.workspace_path:
+            return self._create_result(
+                passed=False,
+                error="No workspace path set"
+            )
+
+        try:
+            # Check if .git directory exists
+            git_dir = self.workspace_path / ".git"
+            if not git_dir.exists():
+                return self._create_result(
+                    passed=False,
+                    details="Git repository not initialized (.git directory missing)"
+                )
+
+            # Run git status --porcelain to get machine-readable status
+            result = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=self.workspace_path,
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode != 0:
+                return self._create_result(
+                    passed=False,
+                    details=f"Git command failed: {result.stderr}"
+                )
+
+            status_output = result.stdout.strip()
+
+            # Empty output means clean repository
+            if not status_output:
+                return self._create_result(
+                    passed=True,
+                    details="✓ Git repository is clean (no untracked or uncommitted files)"
+                )
+
+            # Parse status output
+            lines = status_output.split('\n')
+            untracked = [line for line in lines if line.startswith('??')]
+            modified = [line for line in lines if not line.startswith('??')]
+
+            results = []
+            is_clean = True
+
+            if modified:
+                is_clean = False
+                results.append(f"✗ {len(modified)} uncommitted change(s):")
+                for line in modified[:5]:  # Show first 5
+                    results.append(f"  {line}")
+                if len(modified) > 5:
+                    results.append(f"  ... and {len(modified) - 5} more")
+
+            if untracked and not self.allow_untracked:
+                is_clean = False
+                results.append(f"✗ {len(untracked)} untracked file(s):")
+                for line in untracked[:5]:  # Show first 5
+                    results.append(f"  {line}")
+                if len(untracked) > 5:
+                    results.append(f"  ... and {len(untracked) - 5} more")
+            elif untracked and self.allow_untracked:
+                results.append(f"ℹ {len(untracked)} untracked file(s) (allowed)")
+
+            return self._create_result(
+                passed=is_clean,
+                details="\n".join(results)
+            )
+
+        except Exception as e:
+            return self._create_result(
+                passed=False,
+                error=f"Error checking git status: {e}"
+            )
+
+
 class JSONValidationCheck(BaseCheck):
     """Check if a file contains valid JSON."""
 

@@ -31,6 +31,7 @@ from src.checks.simple import (
     FileContentCheck,
     GitBranchCheck,
     GitConfigCheck,
+    GitCleanCheck,
     DirectoryStructureCheck
 )
 from src.checks.adw import (
@@ -319,6 +320,12 @@ def get_adw_init_checks(adw_result=None, script_path=None):
     checks.append(GitConfigCheck(
         name="github_remote_configured",
         required_remotes=["origin"]
+    ))
+
+    # Verify repository is in clean state (all files committed)
+    checks.append(GitCleanCheck(
+        name="repository_clean_state",
+        allow_untracked=False  # All files should be committed
     ))
 
     return checks
