@@ -254,3 +254,40 @@ class GitManager:
             logger.info(f"Reset to original state: {original_branch}@{original_commit[:8]}")
         except git.GitCommandError as e:
             logger.error(f"Failed to reset to original state: {e}")
+
+    def preserve_workspace(self, workspace_path: Path, run_id: str, base_path: str = "./runs"):
+        """Preserve workspace by copying from temp to runs directory.
+
+        If workspace is in temp directory (accessed via symlink), copy it to runs
+        for permanent preservation.
+
+        Args:
+            workspace_path: Path to the workspace (may be temp or runs)
+            run_id: Unique run identifier
+            base_path: Base directory for test runs
+        """
+        runs_workspace = Path(base_path) / run_id / "workspace"
+
+        # Check if workspace is a symlink (meaning it's in temp)
+        if runs_workspace.is_symlink():
+            # Resolve symlink to get actual temp location
+            temp_workspace = runs_workspace.resolve()
+
+            if temp_workspace.exists():
+                # Remove symlink
+                runs_workspace.unlink()
+
+                # Copy temp workspace to runs
+                shutil.copytree(temp_workspace, runs_workspace, symlinks=False, dirs_exist_ok=True)
+                logger.info(f"Preserved workspace: copied {temp_workspace} to {runs_workspace}")
+
+                # Clean up temp directory
+                try:
+                    shutil.rmtree(temp_workspace.parent)  # Remove run_id directory in temp
+                    logger.info(f"Cleaned up temp workspace: {temp_workspace.parent}")
+                except Exception as e:
+                    logger.warning(f"Could not clean up temp workspace: {e}")
+            else:
+                logger.warning(f"Temp workspace does not exist: {temp_workspace}")
+        else:
+            logger.debug(f"Workspace is not in temp directory, no preservation needed")

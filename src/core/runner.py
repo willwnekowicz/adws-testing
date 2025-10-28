@@ -284,6 +284,9 @@ class TestRunner:
             # Cleanup
             process_manager.cleanup()
 
+            # Preserve workspace (copy from temp to runs if needed)
+            git_manager.preserve_workspace(workspace_path, run_id, self.config.artifacts.base_path)
+
             # Reset git to original state
             git_manager.reset_to_original(original_commit, original_branch)
 
@@ -467,7 +470,7 @@ class TestRunner:
         workspace_path = git_manager.create_test_workspace(
             run_id,
             self.config.artifacts.base_path,
-            use_temp_dir=False,  # ADW tests use persistent directories in runs/
+            use_temp_dir=True,  # Use temp dir to isolate from test framework's git repo
             use_dist=True  # Ensure dist directory is available
         )
         test_logger.info(f"Created workspace: {workspace_path}")
@@ -602,6 +605,9 @@ class TestRunner:
             raise
 
         finally:
+            # Preserve workspace (copy from temp to runs if needed)
+            git_manager.preserve_workspace(workspace_path, run_id, self.config.artifacts.base_path)
+
             # Reset git to original state
             git_manager.reset_to_original(original_commit, original_branch)
 
