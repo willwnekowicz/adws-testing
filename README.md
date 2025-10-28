@@ -32,6 +32,30 @@ When tests fail, the framework should:
 
 If you discover a bug in the code being tested, report it - don't fix it. The testing framework's job is to find problems, not solve them.
 
+## Project Structure
+
+```
+documentation/          # All project documentation and planning
+├── research/          # Technical research and analysis
+├── brainstorming/     # Initial ideas and planning
+├── specs/             # Formal specifications and designs
+└── implementations/   # Implementation notes and retrospectives
+
+scripts/               # Build scripts and automation tools
+
+apps/                  # Application source code
+├── client/           # Client-side code (frontend)
+└── server/           # Server-side code (backend)
+```
+
+### Directory Organization
+
+- **documentation/**: Organize all planning and documentation materials in this hierarchy. Move documents through the lifecycle as they mature from brainstorming to specs to implementation notes.
+
+- **scripts/**: Place all build, deployment, and automation scripts here. Keep scripts well-documented and executable.
+
+- **apps/**: All application code lives here, separated by deployment target. This keeps client and server concerns clearly separated.
+
 ## Features
 
 - **Multi-Model Testing**: Test with Claude 4.5 Sonnet and Haiku models

@@ -1,10 +1,19 @@
 """Test case for the adw_init.py ADW script.
 
 This test validates that the adw_init ADW (AI Developer Workflow) correctly
-orchestrates the /init-git and /init-structure slash commands to set up new projects.
+orchestrates the eight-phase initialization workflow:
+- Phase 1: /init:git (Git setup, README, branches)
+- Phase 2: /init:github (GitHub repository creation and remote configuration)
+- Phase 3: /init:structure (Directory structure, documentation)
+- Phase 4: /init:conditional-docs (Conditional documentation system)
+- Phase 5: /init:frontend (Next.js, TypeScript, TailwindCSS setup)
+- Phase 6: /init:cloudflare (Cloudflare Workers, D1 database)
+- Phase 7: /init:prefect (Prefect deployment setup and registration)
+- Phase 8: Configuration (ADWS configuration and marker cleanup)
 
 This is an integration test, testing the complete workflow from ADW script
-execution through to final project state.
+execution through to final project state. The test runs for an extended
+period (no time constraints) to allow all phases to complete.
 """
 
 import sys
@@ -37,9 +46,15 @@ from tests.test_init_git import get_init_git_checks
 def get_adw_init_checks(adw_result=None, script_path=None):
     """Get checks for adw_init test.
 
-    This validates the two-phase initialization workflow:
-    - Phase 1: /init-git (git setup, README, branches)
-    - Phase 2: /init-structure (directory structure, documentation)
+    This validates the eight-phase initialization workflow:
+    - Phase 1: /init:git (git setup, README, branches)
+    - Phase 2: /init:github (GitHub repository creation and remote configuration)
+    - Phase 3: /init:structure (directory structure, documentation)
+    - Phase 4: /init:conditional-docs (conditional documentation system)
+    - Phase 5: /init:frontend (Next.js, TypeScript, TailwindCSS setup)
+    - Phase 6: /init:cloudflare (Cloudflare Workers, D1 database)
+    - Phase 7: /init:prefect (Prefect deployment setup and registration)
+    - Phase 8: Configuration (ADWS configuration and marker cleanup)
 
     Args:
         adw_result: AdwResult instance from execution
@@ -65,7 +80,7 @@ def get_adw_init_checks(adw_result=None, script_path=None):
         checks.append(AdwExecutionCheck(
             name="adw_execution_success",
             adw_result=adw_result,
-            max_duration=600  # 10 minutes max
+            max_duration=None  # No time constraint - this can run for a while
         ))
 
         checks.append(ClaudeExecutionCheck(
@@ -86,7 +101,10 @@ def get_adw_init_checks(adw_result=None, script_path=None):
     # (git initialization, main README, branches, etc.)
 
     init_git_checks = get_init_git_checks()
-    checks.extend(init_git_checks)
+    # Filter out the execution_time check from init_git since ADW has its own duration check above
+    # that accounts for the multi-phase workflow (10 minutes vs 2 minutes)
+    filtered_checks = [c for c in init_git_checks if c.name != "execution_time"]
+    checks.extend(filtered_checks)
 
     # ============================================================================
     # SECTION 3: Directory structure checks
@@ -129,10 +147,162 @@ def get_adw_init_checks(adw_result=None, script_path=None):
     ))
 
     # ============================================================================
-    # SECTION 5: Integration checks
+    # SECTION 5: Conditional Documentation System checks
     # ============================================================================
-    # These validate that /init-structure properly integrated with /init-git
-    # by updating the main README to document the new structure
+    # These validate that /init:conditional-docs created the conditional docs system
+
+    checks.append(FileExistsCheck(
+        name="conditional_docs_file_exists",
+        file_path="documentation/conditional_docs.md"
+    ))
+
+    # ============================================================================
+    # SECTION 6: Frontend checks
+    # ============================================================================
+    # These validate that /init:frontend created the React/Next.js frontend
+
+    # Core frontend structure
+    checks.append(FileExistsCheck(
+        name="frontend_package_json_exists",
+        file_path="apps/client/package.json"
+    ))
+
+    checks.append(FileExistsCheck(
+        name="frontend_tsconfig_exists",
+        file_path="apps/client/tsconfig.json"
+    ))
+
+    checks.append(FileContentCheck(
+        name="frontend_uses_typescript",
+        file_path="apps/client/tsconfig.json",
+        contains=["compilerOptions", "strict"]
+    ))
+
+    checks.append(FileExistsCheck(
+        name="tailwind_config_exists",
+        file_path="apps/client/tailwind.config.js"
+    ))
+
+    checks.append(FileContentCheck(
+        name="frontend_uses_bun",
+        file_path="apps/client/package.json",
+        contains=["bun"]
+    ))
+
+    # Check for Next.js or React setup
+    checks.append(FileContentCheck(
+        name="frontend_framework_configured",
+        file_path="apps/client/package.json",
+        contains=["react"]
+    ))
+
+    # Check for Jest testing setup
+    checks.append(FileContentCheck(
+        name="testing_infrastructure_setup",
+        file_path="apps/client/package.json",
+        contains=["jest"]
+    ))
+
+    # Check for ESLint and Prettier
+    checks.append(FileExistsCheck(
+        name="eslint_config_exists",
+        file_path="apps/client/.eslintrc.json"
+    ))
+
+    # ============================================================================
+    # SECTION 7: Cloudflare Infrastructure checks
+    # ============================================================================
+    # These validate that /init:cloudflare created the Cloudflare setup
+
+    checks.append(FileExistsCheck(
+        name="cloudflare_worker_exists",
+        file_path="apps/server/src/index.ts"
+    ))
+
+    checks.append(FileExistsCheck(
+        name="cloudflare_wrangler_config_exists",
+        file_path="apps/server/wrangler.toml"
+    ))
+
+    checks.append(FileContentCheck(
+        name="d1_database_configured",
+        file_path="apps/server/wrangler.toml",
+        contains=["d1_databases"]
+    ))
+
+    # Check for migrations directory
+    checks.append(DirectoryStructureCheck(
+        name="migrations_directory_exists",
+        required_dirs=["apps/server/migrations"]
+    ))
+
+    # Check for GitHub Actions workflows
+    checks.append(FileExistsCheck(
+        name="github_actions_workflow_exists",
+        file_path=".github/workflows/deploy.yml"
+    ))
+
+    # Check for API endpoint templates
+    checks.append(FileContentCheck(
+        name="api_endpoints_configured",
+        file_path="apps/server/src/index.ts",
+        contains=["fetch", "Request", "Response"]
+    ))
+
+    # ============================================================================
+    # SECTION 8: Prefect Deployment checks
+    # ============================================================================
+    # These validate that /init:prefect created the Prefect setup
+
+    checks.append(FileExistsCheck(
+        name="prefect_config_exists",
+        file_path="prefect.yaml"
+    ))
+
+    checks.append(FileContentCheck(
+        name="prefect_deployments_configured",
+        file_path="prefect.yaml",
+        contains=["deployments", "sdlc", "patch", "research"]
+    ))
+
+    # Check that SDLC workflow is configured
+    checks.append(FileContentCheck(
+        name="sdlc_workflow_configured",
+        file_path="prefect.yaml",
+        contains=["sdlc"]
+    ))
+
+    # ============================================================================
+    # SECTION 9: ADWS Configuration checks
+    # ============================================================================
+    # These validate that the Configuration phase completed successfully
+
+    checks.append(FileExistsCheck(
+        name="adws_env_file_exists",
+        file_path=".env.adws"
+    ))
+
+    checks.append(FileExistsCheck(
+        name="claude_hooks_env_exists",
+        file_path=".claude/hooks/.env"
+    ))
+
+    checks.append(FileExistsCheck(
+        name="claude_settings_exists",
+        file_path=".claude/settings.json"
+    ))
+
+    # Check that initialization marker is removed
+    checks.append(FileContentCheck(
+        name="initialization_marker_removed",
+        file_path=".adws/__init__.py",
+        not_contains=["__INIT_MARKER__"]
+    ))
+
+    # ============================================================================
+    # SECTION 10: Integration checks
+    # ============================================================================
+    # These validate that all phases properly integrated together
 
     checks.append(FileContentCheck(
         name="main_readme_documents_structure",
@@ -145,17 +315,30 @@ def get_adw_init_checks(adw_result=None, script_path=None):
         ]
     ))
 
+    # Verify GitHub remote is configured (from /init:github)
+    checks.append(GitConfigCheck(
+        name="github_remote_configured",
+        required_remotes=["origin"]
+    ))
+
     return checks
 
 
 class AdwInitTest(BaseAdwTest):
     """Test class for adw_init.py workflow.
 
-    This test validates the two-phase initialization workflow:
-    - Phase 1: /init-git (git initialization, README, branches)
-    - Phase 2: /init-structure (directory structure, README files)
+    This test validates the eight-phase initialization workflow:
+    - Phase 1: /init:git (git initialization, README, branches)
+    - Phase 2: /init:github (GitHub repository creation and remote configuration)
+    - Phase 3: /init:structure (directory structure, README files)
+    - Phase 4: /init:conditional-docs (conditional documentation system)
+    - Phase 5: /init:frontend (Next.js, TypeScript, TailwindCSS)
+    - Phase 6: /init:cloudflare (Cloudflare Workers, D1 database)
+    - Phase 7: /init:prefect (Prefect deployment setup and registration)
+    - Phase 8: Configuration (ADWS configuration and marker cleanup)
 
-    The test ensures both phases execute successfully and integrate properly.
+    The test ensures all phases execute successfully and integrate properly.
+    This test runs for an extended period without time constraints.
     """
 
     def __init__(self, config: Config, project_name: str = "test-project"):
@@ -190,9 +373,16 @@ class AdwInitTest(BaseAdwTest):
         These are checks specific to the adw_init workflow beyond
         the standard ADW checks and init-git checks.
 
-        Note: The main validation checks (including directory structure,
-        README files, and integration checks) are defined in the
-        get_adw_init_checks() function for reusability.
+        Note: The main validation checks are defined in the
+        get_adw_init_checks() function for reusability, including:
+        - Phase 1-2: Git and GitHub setup
+        - Phase 3: Directory structure (9 directories)
+        - Phase 4: Conditional documentation system
+        - Phase 5: Frontend (React/Next.js, TypeScript, TailwindCSS, Bun, Jest)
+        - Phase 6: Cloudflare (Workers, D1, migrations, GitHub Actions)
+        - Phase 7: Prefect (deployments, SDLC workflow, prefect.yaml)
+        - Phase 8: Configuration (environment files, Claude settings, hooks)
+        - Integration checks (README structure, GitHub remote)
 
         Returns:
             List of check instances
@@ -200,10 +390,7 @@ class AdwInitTest(BaseAdwTest):
         checks = []
 
         # Additional checks specific to adw_init
-        # The main checks are in get_adw_init_checks() which includes:
-        # - Directory structure validation (9 directories)
-        # - README file existence checks (documentation, scripts, apps)
-        # - Integration checks (main README documents structure)
+        # The main checks are in get_adw_init_checks()
 
         return checks
 

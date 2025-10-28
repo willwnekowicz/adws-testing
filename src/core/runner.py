@@ -352,6 +352,19 @@ class TestRunner:
                 model=model,
                 additional_args=["--", "/init-cloudflare"]
             )
+        elif test_name == "init-frontend":
+            command = self.config.get_claude_command(
+                model=model,
+                additional_args=["--", "/init-frontend"]
+            )
+        elif test_name == "init-sequence":
+            # Multi-command test: run init-git, init-structure, and init-frontend in sequence
+            # Pass as a prompt that asks Claude to run all three commands
+            prompt = "Run /init-git, then /init-structure, then /init-frontend"
+            command = self.config.get_claude_command(
+                model=model,
+                additional_args=["--", prompt]
+            )
         else:
             # Add other test commands as needed
             command = self.config.get_claude_command(model=model)
@@ -454,7 +467,7 @@ class TestRunner:
         workspace_path = git_manager.create_test_workspace(
             run_id,
             self.config.artifacts.base_path,
-            use_temp_dir=True,  # ADW tests use temp directories
+            use_temp_dir=False,  # ADW tests use persistent directories in runs/
             use_dist=True  # Ensure dist directory is available
         )
         test_logger.info(f"Created workspace: {workspace_path}")

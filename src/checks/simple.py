@@ -43,6 +43,36 @@ class FileExistsCheck(BaseCheck):
         )
 
 
+class FileNotExistsCheck(BaseCheck):
+    """Check that a file does NOT exist."""
+
+    def __init__(self, name: str, file_path: str):
+        """Initialize file non-existence check.
+
+        Args:
+            name: Check name
+            file_path: Path to file relative to workspace
+        """
+        super().__init__(name, CheckType.SIMPLE)
+        self.file_path = file_path
+
+    def execute(self, **kwargs) -> CheckResult:
+        """Check that file does not exist."""
+        if not self.workspace_path:
+            return self._create_result(
+                passed=False,
+                error="No workspace path set"
+            )
+
+        full_path = self.workspace_path / self.file_path
+        exists = full_path.exists()
+
+        return self._create_result(
+            passed=not exists,
+            details=f"File {'should not exist but does' if exists else 'correctly does not exist'}: {self.file_path}"
+        )
+
+
 class FileContentCheck(BaseCheck):
     """Check file content against patterns."""
 

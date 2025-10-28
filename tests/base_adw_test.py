@@ -301,8 +301,8 @@ def run_adw_test_standalone(
     Returns:
         AdwResult from execution
     """
-    import tempfile
-    import shutil
+    import uuid
+    from datetime import datetime
 
     # Load configuration
     config = Config(config_path)
@@ -318,43 +318,52 @@ def run_adw_test_standalone(
     # Create test instance
     test = test_class(config)
 
-    # Create temporary workspace
-    with tempfile.TemporaryDirectory() as temp_dir:
-        workspace = Path(temp_dir)
+    # Create persistent workspace in runs/ directory
+    now = datetime.now()
+    timestamp_prefix = now.strftime("%Y%m%d_%H%M")
+    short_uuid = str(uuid.uuid4())[:8]
+    run_id = f"{timestamp_prefix}_{short_uuid}"
 
-        # Run ADW
-        result = test.run_adw(workspace, dry_run=dry_run)
+    workspace = Path("runs") / run_id / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
 
-        # Print summary
-        test.print_result_summary(result)
+    print(f"\nRun ID: {run_id}")
+    print(f"Workspace: {workspace}\n")
 
-        # Get and execute checks
-        script_path = test.adw_runner.get_adw_path(test.get_adw_name())
-        checks = test.get_all_checks(result, script_path)
+    # Run ADW
+    result = test.run_adw(workspace, dry_run=dry_run)
 
-        print("\nCheck Results:")
-        print("-" * 60)
+    # Print summary
+    test.print_result_summary(result)
 
-        passed = 0
-        failed = 0
+    # Get and execute checks
+    script_path = test.adw_runner.get_adw_path(test.get_adw_name())
+    checks = test.get_all_checks(result, script_path)
 
-        for check in checks:
-            check.set_context(workspace, workspace / "artifacts")
-            check_result = check.execute(adw_result=result, script_path=script_path)
+    print("\nCheck Results:")
+    print("-" * 60)
 
-            status = "✓" if check_result.passed else "✗"
-            print(f"  {status} {check_result.name}")
+    passed = 0
+    failed = 0
 
-            if not check_result.passed:
-                if check_result.details:
-                    print(f"    Details: {check_result.details}")
-                if check_result.error:
-                    print(f"    Error: {check_result.error}")
-                failed += 1
-            else:
-                passed += 1
+    for check in checks:
+        check.set_context(workspace, workspace / "artifacts")
+        check_result = check.execute(adw_result=result, script_path=script_path)
 
-        print("-" * 60)
-        print(f"Summary: {passed} passed, {failed} failed")
+        status = "✓" if check_result.passed else "✗"
+        print(f"  {status} {check_result.name}")
 
-        return result
+        if not check_result.passed:
+            if check_result.details:
+                print(f"    Details: {check_result.details}")
+            if check_result.error:
+                print(f"    Error: {check_result.error}")
+            failed += 1
+        else:
+            passed += 1
+
+    print("-" * 60)
+    print(f"Summary: {passed} passed, {failed} failed")
+    print(f"\nRun artifacts saved to: runs/{run_id}/")
+
+    return result
