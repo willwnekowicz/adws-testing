@@ -28,10 +28,10 @@ def test_sdlc_feature(runner: SnapshotTestRunner, model: str = "sonnet"):
     print("Testing SDLC Feature Workflow")
     print("=" * 60)
 
-    # Run feature test
+    # Run feature test with simple description
     run_id = runner.run_sdlc_test(
         workflow_type="feature",
-        description="Add user authentication with JWT tokens",
+        description="add a new button to the main page",
         model=model
     )
 

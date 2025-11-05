@@ -170,37 +170,63 @@ class SnapshotTestRunner(TestRunner):
 
         # Define callback to run after restoration
         def run_sdlc_workflow(workspace: Path):
-            """Execute the actual SDLC workflow."""
+            """Execute the actual SDLC workflow via Prefect."""
             setup_sdlc(workspace)
 
-            # Execute the sdlc command
-            logger.info(f"Executing SDLC workflow: {description}")
-            logger.info(f"Command: uv run .adws/sdlc/adw_sdlc.py \"{description}\"")
+            # Get project name from workspace
+            project_name = workspace.name.split('/')[-1] if '/' in str(workspace) else "test-project"
 
-            # Run the SDLC command
+            # Execute the Prefect trigger command
+            logger.info(f"Triggering Prefect SDLC workflow: {description}")
+            logger.info(f"Command: .adws/prefect/trigger.sh {project_name} \"{description}\"")
+
+            # Run the Prefect trigger script
             result = subprocess.run(
-                ["uv", "run", ".adws/sdlc/adw_sdlc.py", description],
+                [".adws/prefect/trigger.sh", project_name, description],
                 cwd=workspace,
                 capture_output=True,
                 text=True,
                 timeout=600  # 10 minute timeout
             )
 
-            logger.info(f"SDLC command exit code: {result.returncode}")
+            logger.info(f"Prefect trigger exit code: {result.returncode}")
 
             if result.returncode != 0:
-                logger.error(f"SDLC workflow failed: {result.stderr}")
+                logger.error(f"Prefect trigger failed: {result.stderr}")
                 # Don't fail the test yet - let checks determine pass/fail
             else:
-                logger.info("SDLC workflow completed successfully")
+                logger.info("Prefect flow triggered successfully")
+
+            # Extract flow run ID from output if available
+            flow_run_id = None
+            for line in result.stdout.split('\n'):
+                if 'flow-run' in line or 'Flow run' in line:
+                    # Try to extract flow run ID
+                    import re
+                    match = re.search(r'([a-f0-9-]{36})', line)
+                    if match:
+                        flow_run_id = match.group(1)
+                        logger.info(f"Flow run ID: {flow_run_id}")
+                        break
+
+            # TODO: Monitor flow run completion using Prefect API
+            # For now, just wait a bit and check the workspace state
+            if flow_run_id:
+                logger.info("Waiting for flow to complete...")
+                import time
+                time.sleep(30)  # Give it time to start
+                # In a real implementation, we'd poll the Prefect API here
 
             # Log the output for debugging
-            output_file = workspace.parent / "sdlc_output.log"
+            output_file = workspace.parent / "prefect_output.log"
             with open(output_file, 'w') as f:
                 f.write("=== STDOUT ===\n")
                 f.write(result.stdout)
                 f.write("\n\n=== STDERR ===\n")
                 f.write(result.stderr)
+                if flow_run_id:
+                    f.write(f"\n\n=== FLOW RUN ID ===\n")
+                    f.write(flow_run_id)
 
         # Get SDLC-specific checks
         checks = get_sdlc_checks(workflow_type)
