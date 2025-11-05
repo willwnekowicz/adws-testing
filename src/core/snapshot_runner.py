@@ -189,8 +189,17 @@ class SnapshotTestRunner(TestRunner):
             """Execute the actual SDLC workflow via Prefect."""
             setup_sdlc(workspace)
 
-            # Use test-specific project name to clearly mark this as a test
-            project_name = "adws-testing-workspace"
+            # Extract project name from prefect.yaml
+            import yaml
+            prefect_yaml_path = workspace / "prefect.yaml"
+            project_name = "test-project"  # Default fallback
+
+            if prefect_yaml_path.exists():
+                with open(prefect_yaml_path, 'r') as f:
+                    prefect_config = yaml.safe_load(f)
+                    if prefect_config and 'name' in prefect_config:
+                        project_name = prefect_config['name']
+                        logger.info(f"Extracted project name from prefect.yaml: {project_name}")
 
             # Execute the Prefect trigger command with test tags
             logger.info(f"Triggering Prefect SDLC workflow: {description}")
