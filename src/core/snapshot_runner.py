@@ -28,6 +28,8 @@ class SnapshotTestRunner(TestRunner):
         """
         super().__init__(config)
         self.snapshot_manager = SnapshotManager(Path.cwd())
+        self.runs_dir = Path.cwd() / "runs"
+        self.runs_dir.mkdir(parents=True, exist_ok=True)
 
     def run_with_snapshot(
         self,
@@ -86,16 +88,28 @@ class SnapshotTestRunner(TestRunner):
 
             # Now run checks on the workspace
             logger.info(f"Running {len(checks)} checks for test '{test_name}'")
-            results = self._run_checks(checks, workspace)
+            results = []
+            for check in checks:
+                logger.info(f"Running check: {check.name}")
+                passed = check.execute(workspace)
+                results.append({
+                    "name": check.name,
+                    "passed": passed,
+                    "message": getattr(check, 'message', '')
+                })
 
             # Save results
-            self._save_results(run_dir, {
-                "test_name": test_name,
-                "snapshot_used": snapshot_name or self.snapshot_manager.metadata.get("default"),
-                "overlays": {k: str(v) for k, v in (overlay_dirs or {}).items()},
-                "checks": results,
-                "workspace": str(workspace)
-            })
+            import json
+            results_file = run_dir / "results.json"
+            with open(results_file, 'w') as f:
+                json.dump({
+                    "test_name": test_name,
+                    "snapshot_used": snapshot_name or self.snapshot_manager.metadata.get("default"),
+                    "overlays": {k: str(v) for k, v in (overlay_dirs or {}).items()},
+                    "checks": results,
+                    "workspace": str(workspace),
+                    "timestamp": datetime.now().isoformat()
+                }, f, indent=2)
 
             # Report summary
             passed = sum(1 for r in results if r["passed"])
@@ -118,6 +132,8 @@ class SnapshotTestRunner(TestRunner):
     ) -> str:
         """Run an SDLC workflow test using a snapshot.
 
+        This actually executes the SDLC command and monitors its completion.
+
         Args:
             workflow_type: Type of workflow (feature, bug, chore)
             description: Description of the work
@@ -127,6 +143,8 @@ class SnapshotTestRunner(TestRunner):
         Returns:
             Run ID for the test
         """
+        import subprocess
+        import json
         from ..checks.sdlc import get_sdlc_checks
 
         test_name = f"sdlc_{workflow_type}"
@@ -134,22 +152,55 @@ class SnapshotTestRunner(TestRunner):
         # Define setup for SDLC test
         def setup_sdlc(workspace: Path):
             """Set up workspace for SDLC test."""
-            # Create a simple change request file
-            request_file = workspace / ".sdlc_request.txt"
-            request_file.write_text(f"{workflow_type}: {description}")
+            logger.info("Setting up SDLC test workspace")
 
             # Ensure git is clean
-            import subprocess
             subprocess.run(
                 ["git", "add", "-A"],
                 cwd=workspace,
                 capture_output=True
             )
             subprocess.run(
-                ["git", "commit", "-m", "Initial snapshot state"],
+                ["git", "commit", "-m", "Initial snapshot state", "--allow-empty"],
                 cwd=workspace,
                 capture_output=True
             )
+
+            logger.info("Workspace ready for SDLC execution")
+
+        # Define callback to run after restoration
+        def run_sdlc_workflow(workspace: Path):
+            """Execute the actual SDLC workflow."""
+            setup_sdlc(workspace)
+
+            # Execute the sdlc command
+            logger.info(f"Executing SDLC workflow: {description}")
+            logger.info(f"Command: uv run .adws/sdlc/adw_sdlc.py \"{description}\"")
+
+            # Run the SDLC command
+            result = subprocess.run(
+                ["uv", "run", ".adws/sdlc/adw_sdlc.py", description],
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                timeout=600  # 10 minute timeout
+            )
+
+            logger.info(f"SDLC command exit code: {result.returncode}")
+
+            if result.returncode != 0:
+                logger.error(f"SDLC workflow failed: {result.stderr}")
+                # Don't fail the test yet - let checks determine pass/fail
+            else:
+                logger.info("SDLC workflow completed successfully")
+
+            # Log the output for debugging
+            output_file = workspace.parent / "sdlc_output.log"
+            with open(output_file, 'w') as f:
+                f.write("=== STDOUT ===\n")
+                f.write(result.stdout)
+                f.write("\n\n=== STDERR ===\n")
+                f.write(result.stderr)
 
         # Get SDLC-specific checks
         checks = get_sdlc_checks(workflow_type)
@@ -159,7 +210,7 @@ class SnapshotTestRunner(TestRunner):
             test_name=test_name,
             checks=checks,
             snapshot_name=snapshot_name,
-            setup_callback=setup_sdlc
+            setup_callback=run_sdlc_workflow
         )
 
     def run_slash_command_test(

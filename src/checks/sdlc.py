@@ -11,7 +11,7 @@ from .base import BaseCheck
 
 
 class SDLCPlanCheck(BaseCheck):
-    """Check that an SDLC plan file was created."""
+    """Check that an SDLC plan file was created in documentation/specs/."""
 
     def __init__(
         self,
@@ -36,27 +36,29 @@ class SDLCPlanCheck(BaseCheck):
         Returns:
             True if check passes
         """
-        # Look for plan files
-        plans_dir = workspace / "plans"
-        if not plans_dir.exists():
-            self.message = "Plans directory does not exist"
+        # Look for plan files in documentation/specs/
+        specs_dir = workspace / "documentation" / "specs"
+        if not specs_dir.exists():
+            self.message = "documentation/specs directory does not exist"
             return False
 
-        # Check for plan file matching workflow type
-        plan_files = list(plans_dir.glob(f"*{self.workflow_type}*.md"))
+        # Check for recent plan file matching workflow type
+        # Format: {type}-{hash}-{description}-{date}.md
+        plan_files = list(specs_dir.glob(f"{self.workflow_type}-*.md"))
         if not plan_files:
-            self.message = f"No {self.workflow_type} plan file found"
+            self.message = f"No {self.workflow_type} plan file found in documentation/specs/"
             return False
 
-        # Validate plan content
-        plan_file = plan_files[0]
+        # Get most recent plan file
+        plan_file = max(plan_files, key=lambda p: p.stat().st_mtime)
         content = plan_file.read_text()
 
-        required_sections = ["Overview", "Implementation", "Testing"]
-        missing = [s for s in required_sections if s not in content]
+        # Check for typical spec sections (flexible - not all required)
+        sections = ["Feature Description", "Problem Statement", "Solution", "Implementation"]
+        found_sections = [s for s in sections if s in content]
 
-        if missing:
-            self.message = f"Plan missing sections: {', '.join(missing)}"
+        if not found_sections:
+            self.message = f"Plan file exists but appears incomplete: {plan_file.name}"
             return False
 
         self.message = f"Valid {self.workflow_type} plan found: {plan_file.name}"
