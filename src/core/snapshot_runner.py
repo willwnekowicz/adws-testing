@@ -70,7 +70,8 @@ class SnapshotTestRunner(TestRunner):
                 if standard_config.exists():
                     overlay_dirs = {
                         ".adws": standard_config / ".adws",
-                        ".claude": standard_config / ".claude"
+                        ".claude": standard_config / ".claude",
+                        "prefect.yaml": standard_config / "prefect.yaml"
                     }
                     logger.info("Using latest standard-configuration for overlay")
 
