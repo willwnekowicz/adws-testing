@@ -116,3 +116,7 @@ worker-configuration.d.ts
 # Project specific
 runs/
 alembic.ini.local
+
+# Snapshots (large, generated locally)
+snapshots/*/
+!snapshots/metadata.json

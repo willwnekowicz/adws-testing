@@ -1,0 +1,18 @@
+{
+  "snapshots": {
+    "init-complete-frontend": {
+      "created_at": "2025-11-05T13:22:08.996151",
+      "source_workspace": "runs/20251026_2217_80f39d66/workspace",
+      "description": "Complete initialized project workspace with all phases completed: git, github, structure, docs, frontend, cloudflare, prefect, and configuration",
+      "tags": [
+        "init",
+        "complete",
+        "all-phases"
+      ],
+      "files_count": 27325,
+      "dirs_count": 3642,
+      "size_bytes": 382557418
+    }
+  },
+  "default": "init-complete-frontend"
+}
