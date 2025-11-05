@@ -166,6 +166,21 @@ class SnapshotTestRunner(TestRunner):
                 capture_output=True
             )
 
+            # Register Prefect deployments for testing
+            logger.info("Registering Prefect deployments for test...")
+            deploy_result = subprocess.run(
+                ["prefect", "deploy", "--all"],
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+
+            if deploy_result.returncode != 0:
+                logger.error(f"Failed to register Prefect deployments: {deploy_result.stderr}")
+                raise RuntimeError(f"Prefect deployment registration failed: {deploy_result.stderr}")
+
+            logger.info("Prefect deployments registered successfully")
             logger.info("Workspace ready for SDLC execution")
 
         # Define callback to run after restoration
@@ -173,12 +188,18 @@ class SnapshotTestRunner(TestRunner):
             """Execute the actual SDLC workflow via Prefect."""
             setup_sdlc(workspace)
 
-            # Get project name from workspace
-            project_name = workspace.name.split('/')[-1] if '/' in str(workspace) else "test-project"
+            # Use test-specific project name to clearly mark this as a test
+            project_name = "adws-testing-workspace"
 
-            # Execute the Prefect trigger command
+            # Execute the Prefect trigger command with test tags
             logger.info(f"Triggering Prefect SDLC workflow: {description}")
+            logger.info(f"Project: {project_name} (TEST)")
             logger.info(f"Command: .adws/prefect/trigger.sh {project_name} \"{description}\"")
+
+            # Set environment to mark this as a test run
+            import os
+            env = os.environ.copy()
+            env['ADWS_TEST_RUN'] = 'true'
 
             # Run the Prefect trigger script
             result = subprocess.run(
@@ -186,7 +207,8 @@ class SnapshotTestRunner(TestRunner):
                 cwd=workspace,
                 capture_output=True,
                 text=True,
-                timeout=600  # 10 minute timeout
+                timeout=600,  # 10 minute timeout
+                env=env
             )
 
             logger.info(f"Prefect trigger exit code: {result.returncode}")
@@ -209,13 +231,43 @@ class SnapshotTestRunner(TestRunner):
                         logger.info(f"Flow run ID: {flow_run_id}")
                         break
 
-            # TODO: Monitor flow run completion using Prefect API
-            # For now, just wait a bit and check the workspace state
+            # Monitor flow run completion using Prefect API
             if flow_run_id:
-                logger.info("Waiting for flow to complete...")
+                logger.info(f"Monitoring flow run: {flow_run_id}")
                 import time
-                time.sleep(30)  # Give it time to start
-                # In a real implementation, we'd poll the Prefect API here
+
+                max_wait = 600  # 10 minutes
+                poll_interval = 10  # Check every 10 seconds
+                elapsed = 0
+
+                while elapsed < max_wait:
+                    # Check flow status using prefect CLI
+                    status_result = subprocess.run(
+                        ["prefect", "flow-run", "inspect", flow_run_id],
+                        cwd=workspace,
+                        capture_output=True,
+                        text=True,
+                        timeout=10
+                    )
+
+                    if status_result.returncode == 0:
+                        output = status_result.stdout.lower()
+                        if 'completed' in output:
+                            logger.info(f"Flow run completed successfully after {elapsed}s")
+                            break
+                        elif 'failed' in output or 'crashed' in output:
+                            logger.error(f"Flow run failed after {elapsed}s")
+                            break
+                        elif 'running' in output or 'pending' in output:
+                            logger.info(f"Flow still running... ({elapsed}s elapsed)")
+
+                    time.sleep(poll_interval)
+                    elapsed += poll_interval
+
+                if elapsed >= max_wait:
+                    logger.warning(f"Flow run monitoring timed out after {max_wait}s")
+            else:
+                logger.warning("No flow run ID found in output, cannot monitor progress")
 
             # Log the output for debugging
             output_file = workspace.parent / "prefect_output.log"
